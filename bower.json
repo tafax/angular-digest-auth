@@ -1,0 +1,19 @@
+{
+    "name": "angular-digest-auth",
+    "version": "0.1.0",
+    "main": "./dist/angular-digest-auth.min.js",
+    "description": "AngularJS module to manage HTTP Digest Authentication",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/tafax/angular-digest-auth.git"
+    },
+    "dependencies": {
+        "angular-md5": ">=0.0.3",
+        "angular": ">=1.2.5"
+    },
+    "ignore": [
+        "node_modules",
+        "components",
+        "lib"
+    ]
+}

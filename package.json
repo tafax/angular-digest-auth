@@ -1,0 +1,31 @@
+{
+  "name": "angular-digest-auth",
+  "version": "0.1.0",
+  "filename": "angular-digest-auth.min.js",
+  "main": "./dist/angular-digest-auth.min.js",
+  "homepage": "https://github.com/mgonto/angular-digest-auth",
+  "author": "Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/tafax/angular-digest-auth.git"
+  },
+  "devDependencies": {
+    "grunt-cli": ">= 0.1.7",
+    "grunt-contrib-uglify": "*",
+    "grunt-conventional-changelog": "*",
+    "grunt-bower-task": "~0.3.4",
+    "grunt-contrib-concat": "~0.3.0",
+    "grunt-remove-logging": "~0.2.0"
+  },
+  "description": "AngularJS module to manage HTTP Digest Authentication",
+  "bugs": {
+    "url": "https://github.com/tafax/angular-digest-auth/issues"
+  },
+  "scripts": {
+    "test": "test"
+  },
+  "keywords": [
+    "angular"
+  ],
+  "license": "MIT"
+}

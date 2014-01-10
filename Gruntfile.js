@@ -50,7 +50,7 @@ module.exports = function(grunt)
             },
             dist: {
                 src: ['<%= dirs.src %>/**/*.js'],
-                dest: '<%= dirs.dest %>/<%= pkg.name %>.js'
+                dest: '<%= dirs.dest %>/<%= pkg.name %>.dev.js'
             }
         },
         removelogging: {

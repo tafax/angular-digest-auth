@@ -43,7 +43,7 @@ dhAuth.config(['$httpProvider', function($httpProvider)
 
                 if(rejection.status === 401)
                 {
-                    
+                    console.debug("Server has requested an authentication.");
 
                     var deferred = $q.defer();
                     var request = {
@@ -57,7 +57,7 @@ dhAuth.config(['$httpProvider', function($httpProvider)
 
                     $serverAuth.parseHeader(header);
 
-                    
+                    console.debug('Parse header for authentication: ' + header);
                     $rootScope.$broadcast($authConfig.getEvent('authentication.header'), header);
 
                     if(!$authService.restoreCredential())
@@ -88,7 +88,7 @@ dhAuth.run([
 
         var resendRequests = function()
         {
-            
+            console.debug('Request another sign in.');
 
             for(var i=0; i<$rootScope.requests401.length; i++)
             {
@@ -103,7 +103,7 @@ dhAuth.run([
 
         $rootScope.$on('$authRequestSignin', function(event, data)
         {
-            
+            console.debug('Performs a sign in.');
 
             $http.post($authConfig.getSign().signin, $authConfig.getSign().config)
                 .success(data.successful)
@@ -114,7 +114,7 @@ dhAuth.run([
 
         $rootScope.$on('$authRequestSignout', function(event, data)
         {
-            
+            console.debug('Performs a sign out.');
 
             $http.post($authConfig.getSign().signout, $authConfig.getSign().config)
                 .success(data.successful)
@@ -454,7 +454,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $cookies, md5)
 
         var signinSuccessful = function(data)
         {
-            
+            console.debug('Login successful.');
 
             $identity = data;
             $cookies['_auth'] = md5.createHash('true');
@@ -473,7 +473,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $cookies, md5)
 
         var signinError = function(data, status)
         {
-            
+            console.debug('Login error.');
 
             $loginRequest = null;
             $rootScope.$broadcast($authConfig.getEvents().signin.error, data, status);
@@ -481,7 +481,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $cookies, md5)
 
         var signoutSuccessful = function(data)
         {
-            
+            console.debug('Logout successful.');
 
             $cookies['_auth'] = md5.createHash('false');
             $identity = null;
@@ -490,7 +490,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $cookies, md5)
 
         var signoutError = function(data, status)
         {
-            
+            console.debug('Logout error.');
 
             $rootScope.$broadcast($authConfig.getEvents().signout.error, data, status);
         };

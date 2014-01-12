@@ -72,6 +72,15 @@ module.exports = function(grunt)
             options: {
                 dest: 'CHANGELOG.md'
             }
+        },
+        karma: {
+            options: {
+                configFile: 'karma.conf.js'
+            },
+            build: {
+                singleRun: true,
+                autoWatch: false
+            }
         }
     });
 
@@ -87,12 +96,18 @@ module.exports = function(grunt)
     // Load the plugin that provides the "concat" task.
     grunt.loadNpmTasks('grunt-contrib-concat');
 
-    // Load the plugin that provides the "concat" task.
+    // Load the plugin that provides the "removelogging" task.
     grunt.loadNpmTasks('grunt-remove-logging');
+
+    // Load the plugin that provides the "karma" task.
+    grunt.loadNpmTasks('grunt-karma');
 
     // Default task.
     grunt.registerTask('default', ['build']);
 
+    // Test task.
+    grunt.registerTask('test', ['karma:build']);
+
     // Build task.
-    grunt.registerTask('build', ['concat', 'removelogging', 'uglify']);
+    grunt.registerTask('build', ['test', 'concat', 'removelogging', 'uglify']);
 };

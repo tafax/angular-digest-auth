@@ -2,7 +2,7 @@
  * Stores information to remember user credential
  * and server configuration.
  */
-dhAuth.provider('$authStorage', function AuthStorageProvider()
+dgAuth.provider('$authStorage', function AuthStorageProvider()
 {
     /**
      * Creates the service for the storage.
@@ -60,6 +60,7 @@ dhAuth.provider('$authStorage', function AuthStorageProvider()
         this.clear = function()
         {
             $storage.clear();
+            sessionStorage.clear();
         };
     }
 

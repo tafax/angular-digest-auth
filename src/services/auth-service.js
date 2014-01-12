@@ -1,7 +1,7 @@
 /**
  * Used to performs sign in and sign out requests.
  */
-dhAuth.factory('$authService', [
+dgAuth.factory('$authService', [
     '$authConfig',
     '$authStorage',
     '$clientAuth',

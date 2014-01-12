@@ -1,7 +1,7 @@
 /**
  * Manages authentication info in the client scope.
  */
-dhAuth.factory('$clientAuth', [
+dgAuth.factory('$clientAuth', [
     '$rootScope',
     '$serverAuth',
     'md5',

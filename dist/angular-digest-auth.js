@@ -11,7 +11,7 @@
  * dhAuth provides functionality to manage
  * user authentication
  */
-var dhAuth = angular.module('dhAuth', ['angular-md5', 'ngCookies']);
+var dhAuth = angular.module('dgAuth', ['angular-md5', 'ngCookies']);
 
 /**
  * Configures http to intercept requests and responses with error 401.

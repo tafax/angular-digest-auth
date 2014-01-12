@@ -3,7 +3,7 @@
 /**
  * Manages the configuration for the auth module.
  */
-dhAuth.provider('$authConfig', function AuthConfigProvider()
+dgAuth.provider('$authConfig', function AuthConfigProvider()
 {
     function AuthConfig(sign, events, header)
     {

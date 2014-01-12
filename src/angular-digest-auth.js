@@ -1,15 +1,15 @@
 'use strict';
 
 /**
- * dhAuth provides functionality to manage
+ * dgAuth provides functionality to manage
  * user authentication
  */
-var dhAuth = angular.module('dhAuth', ['angular-md5', 'ngCookies']);
+var dgAuth = angular.module('dgAuth', ['angular-md5', 'ngCookies']);
 
 /**
  * Configures http to intercept requests and responses with error 401.
  */
-dhAuth.config(['$httpProvider', function($httpProvider)
+dgAuth.config(['$httpProvider', function($httpProvider)
 {
     $httpProvider.interceptors.push([
         '$rootScope',
@@ -38,6 +38,14 @@ dhAuth.config(['$httpProvider', function($httpProvider)
                 {
                     console.debug("Server has requested an authentication.");
 
+                    var header = rejection.headers($authConfig.getHeader());
+
+                    if(null == header)
+                    {
+                        $rootScope.$broadcast($authConfig.getEvent('authentication.notFound'));
+                        return $q.reject(rejection);
+                    }
+
                     var deferred = $q.defer();
                     var request = {
                         config: rejection.config,
@@ -45,8 +53,6 @@ dhAuth.config(['$httpProvider', function($httpProvider)
                     };
 
                     $rootScope.requests401.push(request);
-
-                    var header = rejection.headers($authConfig.getHeader());
 
                     $serverAuth.parseHeader(header);
 
@@ -70,52 +76,52 @@ dhAuth.config(['$httpProvider', function($httpProvider)
 /**
  * Uses components to manage authentication.
  */
-dhAuth.run([
+dgAuth.run([
     '$rootScope',
     '$authConfig',
     '$authService',
     '$http',
-    function($rootScope, $authConfig, $authService, $http)
+function($rootScope, $authConfig, $authService, $http)
+{
+    $rootScope.requests401 = [];
+
+    var resendRequests = function()
     {
-        $rootScope.requests401 = [];
+        console.debug('Request another sign in.');
 
-        var resendRequests = function()
+        for(var i=0; i<$rootScope.requests401.length; i++)
         {
-            console.debug('Request another sign in.');
+            var request = $rootScope.requests401[i];
 
-            for(var i=0; i<$rootScope.requests401.length; i++)
+            $http(request.config).then(function(response)
             {
-                var request = $rootScope.requests401[i];
+                request.deferred.resolve(response);
+            });
+        }
+    };
 
-                $http(request.config).then(function(response)
-                {
-                    request.deferred.resolve(response);
-                });
-            }
-        };
+    $rootScope.$on('$authRequestSignin', function(event, data)
+    {
+        console.debug('Performs a sign in.');
 
-        $rootScope.$on('$authRequestSignin', function(event, data)
-        {
-            console.debug('Performs a sign in.');
+        $http.post($authConfig.getSign().signin, $authConfig.getSign().config)
+            .success(data.successful)
+            .error(data.error);
 
-            $http.post($authConfig.getSign().signin, $authConfig.getSign().config)
-                .success(data.successful)
-                .error(data.error);
+        event.preventDefault();
+    });
 
-            event.preventDefault();
-        });
+    $rootScope.$on('$authRequestSignout', function(event, data)
+    {
+        console.debug('Performs a sign out.');
 
-        $rootScope.$on('$authRequestSignout', function(event, data)
-        {
-            console.debug('Performs a sign out.');
+        $http.post($authConfig.getSign().signout, $authConfig.getSign().config)
+            .success(data.successful)
+            .error(data.error);
 
-            $http.post($authConfig.getSign().signout, $authConfig.getSign().config)
-                .success(data.successful)
-                .error(data.error);
+        event.preventDefault();
+    });
 
-            event.preventDefault();
-        });
-
-        $rootScope.$on($authConfig.getEvent('credential.submitted'), resendRequests);
-        $rootScope.$on($authConfig.getEvent('credential.restored'), resendRequests);
-    }]);
+    $rootScope.$on($authConfig.getEvent('credential.submitted'), resendRequests);
+    $rootScope.$on($authConfig.getEvent('credential.restored'), resendRequests);
+}]);

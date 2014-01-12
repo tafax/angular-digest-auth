@@ -1,7 +1,7 @@
 /**
  * Parses and provides server information for the authentication.
  */
-dhAuth.factory('$serverAuth', ['$authStorage', function($authStorage)
+dgAuth.factory('$serverAuth', ['$authStorage', function($authStorage)
 {
     /**
      * Creates the service for the server info.

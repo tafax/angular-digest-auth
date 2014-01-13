@@ -81,6 +81,13 @@ module.exports = function(grunt)
                 singleRun: true,
                 autoWatch: false
             }
+        },
+        bump: {
+            options: {
+                files: ['package.json', 'bower.json'],
+                commit: false,
+                push: false
+            }
         }
     });
 
@@ -101,6 +108,9 @@ module.exports = function(grunt)
 
     // Load the plugin that provides the "karma" task.
     grunt.loadNpmTasks('grunt-karma');
+
+    // Load the plugin that provides the "bump" task.
+    grunt.loadNpmTasks('grunt-bump');
 
     // Default task.
     grunt.registerTask('default', ['build']);

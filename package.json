@@ -26,7 +26,8 @@
     "karma-coffee-preprocessor": "~0.1.2",
     "karma-phantomjs-launcher": "~0.1.1",
     "karma": "~0.10.9",
-    "grunt-karma": "~0.6.2"
+    "grunt-karma": "~0.6.2",
+    "grunt-bump": "0.0.13"
   },
   "description": "AngularJS module to manage HTTP Digest Authentication",
   "bugs": {

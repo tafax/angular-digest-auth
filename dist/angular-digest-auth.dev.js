@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.1.0 - 2014-01-10
+ * @version v0.1.0 - 2014-01-13
  * @link https://github.com/mgonto/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -8,42 +8,47 @@
 'use strict';
 
 /**
- * dhAuth provides functionality to manage
+ * dgAuth provides functionality to manage
  * user authentication
  */
-var dhAuth = angular.module('dgAuth', ['angular-md5', 'ngCookies']);
+var dgAuth = angular.module('dgAuth', ['angular-md5', 'ngCookies']);
 
 /**
  * Configures http to intercept requests and responses with error 401.
  */
-dhAuth.config(['$httpProvider', function($httpProvider)
+dgAuth.config(['$httpProvider', function($httpProvider)
 {
     $httpProvider.interceptors.push([
         '$rootScope',
         '$q',
         '$authConfig',
-        '$authService',
-        '$serverAuth',
-    function($rootScope, $q, $authConfig, $authService, $serverAuth)
+    function($rootScope, $q, $authConfig)
     {
         return {
             'request': function(request)
             {
-                $authService.processRequest(request);
+                $rootScope.$broadcast($authConfig.getEvent('process.request'), request);
 
                 return (request || $q.when(request));
             },
             'responseError': function(rejection)
             {
-                if($authService.isLoginRequested())
-                {
-                    $rootScope.$broadcast($authConfig.getEvent('login.error'), rejection);
-                    return $q.reject(rejection);
-                }
-
                 if(rejection.status === 401)
                 {
+                    $rootScope.$broadcast($authConfig.getEvent('process.response'), rejection);
+
+                    if(rejection.login)
+                        return $q.reject(rejection);
+
                     console.debug("Server has requested an authentication.");
+
+                    var header = rejection.headers($authConfig.getHeader());
+
+                    if(null == header)
+                    {
+                        $rootScope.$broadcast($authConfig.getEvent('authentication.notFound'));
+                        return $q.reject(rejection);
+                    }
 
                     var deferred = $q.defer();
                     var request = {
@@ -51,19 +56,9 @@ dhAuth.config(['$httpProvider', function($httpProvider)
                         deferred: deferred
                     };
 
-                    $rootScope.requests401.push(request);
-
-                    var header = rejection.headers($authConfig.getHeader());
-
-                    $serverAuth.parseHeader(header);
-
                     console.debug('Parse header for authentication: ' + header);
-                    $rootScope.$broadcast($authConfig.getEvent('authentication.header'), header);
-
-                    if(!$authService.restoreCredential())
-                    {
-                        $rootScope.$broadcast($authConfig.getEvent('login.required'));
-                    }
+                    $rootScope.$broadcast($authConfig.getEvent('authentication.header'), header, request);
+                    $rootScope.$broadcast($authConfig.getEvent('signin.required'));
 
                     return deferred.promise;
                 }
@@ -77,59 +72,71 @@ dhAuth.config(['$httpProvider', function($httpProvider)
 /**
  * Uses components to manage authentication.
  */
-dhAuth.run([
+dgAuth.run([
     '$rootScope',
     '$authConfig',
     '$authService',
+    '$serverAuth',
     '$http',
-    function($rootScope, $authConfig, $authService, $http)
+function($rootScope, $authConfig, $authService, $serverAuth, $http)
+{
+    $rootScope.requests401 = [];
+
+    var resendRequests = function()
     {
-        $rootScope.requests401 = [];
+        console.debug('Request another sign in.');
 
-        var resendRequests = function()
+        for(var i=0; i<$rootScope.requests401.length; i++)
         {
-            console.debug('Request another sign in.');
+            var request = $rootScope.requests401[i];
 
-            for(var i=0; i<$rootScope.requests401.length; i++)
+            $http(request.config).then(function(response)
             {
-                var request = $rootScope.requests401[i];
+                request.deferred.resolve(response);
+            },
+            function(response)
+            {
+                request.deferred.reject(response);
+            });
+        }
+    };
 
-                $http(request.config).then(function(response)
-                {
-                    request.deferred.resolve(response);
-                });
-            }
-        };
+    $rootScope.$on($authConfig.getEvent('process.request'), function(event, request)
+    {
+        $authService.processRequest(request);
+    });
 
-        $rootScope.$on('$authRequestSignin', function(event, data)
+    $rootScope.$on($authConfig.getEvent('process.response'), function(event, response)
+    {
+        if($authService.isLoginRequested())
+            response.login = true;
+    });
+
+    $rootScope.$on($authConfig.getEvent('authentication.header'), function(event, header, request)
+    {
+        $rootScope.requests401.push(request);
+        $serverAuth.parseHeader(header);
+    });
+
+    $rootScope.$on($authConfig.getEvent('signin.required'), function(event)
+    {
+        if($authService.restoreCredential())
         {
-            console.debug('Performs a sign in.');
-
-            $http.post($authConfig.getSign().signin, $authConfig.getSign().config)
-                .success(data.successful)
-                .error(data.error);
-
             event.preventDefault();
-        });
+            resendRequests();
+        }
+    });
 
-        $rootScope.$on('$authRequestSignout', function(event, data)
-        {
-            console.debug('Performs a sign out.');
-
-            $http.post($authConfig.getSign().signout, $authConfig.getSign().config)
-                .success(data.successful)
-                .error(data.error);
-
-            event.preventDefault();
-        });
-
-        $rootScope.$on($authConfig.getEvent('credential.submitted'), resendRequests);
-        $rootScope.$on($authConfig.getEvent('credential.restored'), resendRequests);
-    }]);
+    $rootScope.$on($authConfig.getEvent('credential.submitted'), function(event, credential)
+    {
+        console.debug('Submitted credential.');
+        resendRequests();
+    });
+}]);
 /**
  * Manages authentication info in the client scope.
  */
-dhAuth.factory('$clientAuth', [
+dgAuth.factory('$clientAuth', [
     '$rootScope',
     '$serverAuth',
     'md5',
@@ -264,24 +271,50 @@ function($rootScope, $serverAuth, md5)
 /**
  * Manages the configuration for the auth module.
  */
-dhAuth.provider('$authConfig', function AuthConfigProvider()
+dgAuth.provider('$authConfig', function()
 {
+    /**
+     * AuthConfig provides a service to get
+     * basic configuration
+     *
+     * @param {Object} sign Object to represent sign in, sign out urls and configuration.
+     * @param {Object} events Object to represent all events.
+     * @param {String} header Specifies header to get authentication string from the server response.
+     * @constructor
+     */
     function AuthConfig(sign, events, header)
     {
         var $sign = sign;
         var $events = events;
         var $header = header;
 
+        /**
+         * Gets the sign object.
+         *
+         * @returns {Object}
+         */
         this.getSign = function()
         {
             return $sign;
         };
 
+        /**
+         * Gets all events.
+         *
+         * @returns {Object}
+         */
         this.getEvents = function()
         {
             return $events;
         };
 
+        /**
+         * Gets single event by the string provided.
+         * ex: "authentication.header" is the event $events['authentication']['header'].
+         *
+         * @param event
+         * @returns {String}
+         */
         this.getEvent = function(event)
         {
             var split = event.split('.');
@@ -289,24 +322,40 @@ dhAuth.provider('$authConfig', function AuthConfigProvider()
             return $events[split[0]][split[1]];
         };
 
+        /**
+         * Gets the header.
+         *
+         * @returns {String}
+         */
         this.getHeader = function()
         {
             return $header;
         };
     }
 
+    /**
+     * The sign object.
+     *
+     * @type {{signin: string, signout: string, config: {}}}
+     */
     var $sign = {
-        // Sign in url. Default is not configured.
         signin: '',
-        // Sign out url. Default is not configured.
         signout: '',
-        // Requests config.
-        config: ''
+        config: {}
     };
 
+    /**
+     * All events in the module.
+     *
+     * @type {{authentication: {header: string}, process: {request: string, response: string}, signin: {successful: string, error: string, required: string}, signout: {successful: string, error: string}, credential: {submitted: string, stored: string, restored: string}}}
+     */
     var $events = {
         authentication: {
             header: '$authAuthenticationHeader'
+        },
+        process: {
+            request: '$authProcessRequest',
+            response: '$authProcessResponse'
         },
         signin: {
             successful: '$authSigninSuccessful',
@@ -324,23 +373,48 @@ dhAuth.provider('$authConfig', function AuthConfigProvider()
         }
     };
 
+    /**
+     * The header string.
+     *
+     * @type {string}
+     */
     var $header = '';
 
+    /**
+     * Sets the sign object by extending basic configuration.
+     *
+     * @param {Object} sign
+     */
     this.setSign = function(sign)
     {
         angular.extend($sign, sign);
     };
 
+    /**
+     * Sets events by extending basic configuration.
+     *
+     * @param {Object} events
+     */
     this.setEvents = function(events)
     {
         angular.extend($events, events);
     };
 
+    /**
+     * Sets the header.
+     *
+     * @param {String} header
+     */
     this.setHeader = function(header)
     {
         $header = header;
     };
 
+    /**
+     * Gets AuthConfig service.
+     *
+     * @returns {AuthConfig}
+     */
     this.$get = function()
     {
         return new AuthConfig($sign, $events, $header);
@@ -349,7 +423,7 @@ dhAuth.provider('$authConfig', function AuthConfigProvider()
 /**
  * Parses and provides server information for the authentication.
  */
-dhAuth.factory('$serverAuth', ['$authStorage', function($authStorage)
+dgAuth.factory('$serverAuth', ['$authStorage', function($authStorage)
 {
     /**
      * Creates the service for the server info.
@@ -420,91 +494,71 @@ dhAuth.factory('$serverAuth', ['$authStorage', function($authStorage)
 }]);
 
 /**
- * Used to performs sign in and sign out requests.
+ * Used to manage the authentication.
  */
-dhAuth.factory('$authService', [
+dgAuth.factory('$authService', [
     '$authConfig',
     '$authStorage',
     '$clientAuth',
     '$rootScope',
+    '$http',
     '$cookies',
     'md5',
-function($authConfig, $authStorage, $clientAuth, $rootScope, $cookies, md5)
+function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md5)
 {
     /**
      * Creates the authentication service to performs
-     * sign in and sign out.
+     * sign in and sign out, manages the current identity
+     * and check the authentication.
      *
      * @constructor
      */
     function AuthService()
     {
+        /**
+         * The current identity
+         *
+         * @type {Object}
+         */
         var $identity;
 
+        /**
+         * The request used to sing in user.
+         *
+         * @type {{username: string, password: string, requested: boolean}}
+         */
         var $loginRequest = {
             username: '',
             password: '',
             requested: false
         };
 
-        var authenticationCheck = function()
-        {
-            return ($cookies['_auth'] == md5.createHash('true') && null !== $identity);
-        };
-
-        var signinSuccessful = function(data)
-        {
-            console.debug('Login successful.');
-
-            $identity = data;
-            $cookies['_auth'] = md5.createHash('true');
-
-            if($loginRequest.requested)
-            {
-                $authStorage.setCredential($loginRequest.username, $loginRequest.password);
-                $rootScope.$broadcast($authConfig.getEvents().credential.stored, {
-                    username: $loginRequest.username,
-                    password: $loginRequest.password
-                });
-            }
-
-            $rootScope.$broadcast($authConfig.getEvents().signin.successful, data);
-        };
-
-        var signinError = function(data, status)
-        {
-            console.debug('Login error.');
-
-            $loginRequest = null;
-            $rootScope.$broadcast($authConfig.getEvents().signin.error, data, status);
-        };
-
-        var signoutSuccessful = function(data)
-        {
-            console.debug('Logout successful.');
-
-            $cookies['_auth'] = md5.createHash('false');
-            $identity = null;
-            $rootScope.$broadcast($authConfig.getEvents().signout.successful, data);
-        };
-
-        var signoutError = function(data, status)
-        {
-            console.debug('Logout error.');
-
-            $rootScope.$broadcast($authConfig.getEvents().signout.error, data, status);
-        };
-
+        /**
+         * Verifies if the identity is set.
+         *
+         * @returns {boolean}
+         */
         this.hasIdentity = function()
         {
             return (null !== $identity);
         };
 
+        /**
+         * Gets the identity.
+         *
+         * @returns {Object}
+         */
         this.getIdentity = function()
         {
             return $identity;
         };
 
+        /**
+         * Sets the credential used for sign in.
+         *
+         * @param {String} username
+         * @param {String} password
+         */
         this.setLoginRequest = function(username, password)
         {
             $loginRequest = {
@@ -513,24 +567,48 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $cookies, md5)
                 requested: true
             };
 
-            $rootScope.$broadcast($authConfig.getEvents().loginSubmitted, $loginRequest);
+            $rootScope.$broadcast($authConfig.getEvent('credential.submitted'), {
+                username: $loginRequest.username,
+                password: $loginRequest.password,
+                requested: $loginRequest.requested
+            });
         };
 
+        /**
+         * Gets the request for the sign in.
+         *
+         * @returns {{username: string, password: string, requested: boolean}}
+         */
         this.getLoginRequest = function()
         {
             return $loginRequest;
         };
 
+        /**
+         * Checks if the request is set properly.
+         *
+         * @returns {boolean}
+         */
         this.isLoginRequested = function()
         {
             return $loginRequest.requested;
         };
 
+        /**
+         * Checks the authentication.
+         *
+         * @returns {boolean}
+         */
         this.isAuthenticated = function()
         {
-            return authenticationCheck();
+            return ($cookies['_auth'] == md5.createHash('true') && null !== $identity);
         };
 
+        /**
+         * Gets the credential stored in the auth storage.
+         *
+         * @returns {boolean}
+         */
         this.restoreCredential = function()
         {
             if(!$authStorage.hasCredential() || !$clientAuth.isConfigured())
@@ -539,31 +617,82 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $cookies, md5)
             $loginRequest.username = $authStorage.getUsername();
             $loginRequest.password = $authStorage.getPassword();
 
-            $rootScope.$broadcast($authConfig.getEvent('credential.restored'));
-
             return true;
         };
 
+        /**
+         * Processes the request to the server.
+         *
+         * @param {Object} request
+         */
         this.processRequest = function(request)
         {
             if($clientAuth.isConfigured())
                 $clientAuth.processRequest($loginRequest.username, $loginRequest.password, request);
         };
 
+        /**
+         * Performs the sign in.
+         */
         this.signin = function()
         {
-            $rootScope.$broadcast('$authRequestSignin', {
-                successful: signinSuccessful,
-                error: signinError
-            })
+            console.debug('Performs a sign in.');
+
+            $http.post($authConfig.getSign().signin, $authConfig.getSign().config)
+                .success(function(data)
+                {
+                    console.debug('Sign in successful.');
+
+                    $identity = angular.extend({
+                        username: $loginRequest.username
+                    }, data);
+
+                    $cookies['_auth'] = md5.createHash('true');
+
+                    if($loginRequest.requested)
+                    {
+                        $authStorage.setCredential($loginRequest.username, $loginRequest.password);
+                        $rootScope.$broadcast($authConfig.getEvent('credential.stored'), {
+                            username: $loginRequest.username,
+                            password: $loginRequest.password
+                        });
+
+                        $loginRequest.requested = false;
+                    }
+
+                    $rootScope.$broadcast($authConfig.getEvent('signin.successful'), data);
+                })
+                .error(function(data, status)
+                {
+                    console.debug('Sign in error.');
+
+                    $loginRequest = null;
+                    $rootScope.$broadcast($authConfig.getEvent('signin.error'), data, status);
+                });
         };
 
+        /**
+         * Performs the sign out.
+         */
         this.signout = function()
         {
-            $rootScope.$broadcast('$authRequestSignout', {
-                successful: signoutSuccessful,
-                error: signoutError
-            });
+            console.debug('Performs a sign out.');
+
+            $http.post($authConfig.getSign().signout, $authConfig.getSign().config)
+                .success(function(data)
+                {
+                    console.debug('Sign out successful.');
+
+                    $cookies['_auth'] = md5.createHash('false');
+                    $identity = null;
+                    $rootScope.$broadcast($authConfig.getEvent('signout.successful'), data);
+                })
+                .error(function(data, status)
+                {
+                    console.debug('Sign out error.');
+
+                    $rootScope.$broadcast($authConfig.getEvent('signout.error'), data, status);
+                });
         };
     }
 
@@ -574,7 +703,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $cookies, md5)
  * Stores information to remember user credential
  * and server configuration.
  */
-dhAuth.provider('$authStorage', function AuthStorageProvider()
+dgAuth.provider('$authStorage', function AuthStorageProvider()
 {
     /**
      * Creates the service for the storage.
@@ -632,6 +761,7 @@ dhAuth.provider('$authStorage', function AuthStorageProvider()
         this.clear = function()
         {
             $storage.clear();
+            sessionStorage.clear();
         };
     }
 

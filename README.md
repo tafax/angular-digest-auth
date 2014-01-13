@@ -17,25 +17,27 @@ app.config(['$authConfigProvider', function($authConfigProvider)
 }]);
 ````
 How to configure the header to search server information.
+````javascript
+app.config(['$authConfigProvider', function($authConfigProvider)
+{
+    $authConfigProvider.setSign({
+        signin: '/path/to/signin',
+        signin: '/path/to/signout'
+    });
 
-    app.config(['$authConfigProvider', function($authConfigProvider)
-    {
-        $authConfigProvider.setSign({
-            signin: '/path/to/signin',
-            signin: '/path/to/signout'
-        });
-
-        $authConfigProvider.setHeader('X-Header-For-Authentication');
-    }]);
+    $authConfigProvider.setHeader('X-Header-For-Authentication');
+}]);
+````
 
 By default, after the user has made the login, the credentials are stored in **sessionStorage** and the module
 processes all further requests with this credentials. If you want the user is reconnected when he returns in your
 app, you can specify the **localStorage** as default storage.
-
-    app.config(['$authStorageProvider', function($authStorageProvider)
-    {
-        $authStorageProvider.setStorage(localStorage);
-    }]);
+````javascript
+app.config(['$authStorageProvider', function($authStorageProvider)
+{
+    $authStorageProvider.setStorage(localStorage);
+}]);
+````
 
 Obviously, if you want to specify your own storage object, you can :).
 
@@ -43,28 +45,30 @@ Usage
 ===================
 For basic usage, you can launch the `signin()` when your app goes run. Then, you can handle two events: `signin.required`
 and `signin.successful`.
+````javascript
+app.run(['$authConfig', '$authService', function($authConfig, $authService)
+{
+    $authService.signin();
 
-    app.run(['$authConfig', '$authService', function($authConfig, $authService)
+    $authService.$on($authConfig.getEvent('signin.required'), function(event)
     {
-        $authService.signin();
+        //Redirect user to your login page. Ex: $location.path('/path/to/login');
+    });
 
-        $authService.$on($authConfig.getEvent('signin.required'), function(event)
-        {
-            //Redirect user to your login page. Ex: $location.path('/path/to/login');
-        });
-
-        $authService.$on($authConfig.getEvent('signin.successful'), function(event, data)
-        {
-            //Redirect user to you home page. Ex: $location.path('/path/to/home');
-        });
-    }]);
+    $authService.$on($authConfig.getEvent('signin.successful'), function(event, data)
+    {
+        //Redirect user to you home page. Ex: $location.path('/path/to/home');
+    });
+}]);
+````
 
 In your login controller you should provide the credentials submitted by user.
-
-    $scope.submit = function(user)
-    {
-        $authService.setRequest(user.username, user.password);
-    };
+````javascript
+$scope.submit = function(user)
+{
+    $authService.setRequest(user.username, user.password);
+};
+````
 
 After this, the service performs a login again without doing any more.
 
@@ -72,34 +76,34 @@ Events
 ===================
 The module uses several events to provide its functionality. You can use the list of all events to handle
 the module environment.
-
-    authentication: {
-        header: //A valid header is found in server response
-    },
-    process: {
-        request: //A request is processed by the module
-        response: //A response with status 401 is processed by the module
-    },
-    signin: {
-        successful: //The login is successful
-        error: //The login is incorrect
-        required: //The login is required to access a functionality
-    },
-    signout: {
-        successful: //The logout is successful
-        error: //The logout is in error
-    },
-    credential: {
-        submitted: //The new credentials are submitted
-        stored: //The credentials are stored in the auth storage
-        restored: //The credentials in the storage are restore
-    }
+````javascript
+authentication: {
+    header: //A valid header is found in server response
+},
+process: {
+    request: //A request is processed by the module
+    response: //A response with status 401 is processed by the module
+},
+signin: {
+    successful: //The login is successful
+    error: //The login is incorrect
+    required: //The login is required to access a functionality
+},
+signout: {
+    successful: //The logout is successful
+    error: //The logout is in error
+},
+credential: {
+    submitted: //The new credentials are submitted
+    stored: //The credentials are stored in the auth storage
+    restored: //The credentials in the storage are restore
+}
+````
 
 You can use the `$authConfig` service to handle the events and do your own tasks. For example, with
 `$authConfig.getEvent('signin.error')` you can handle if an error appears in the login procedure and
 afterwards you can notify this error in your view to the user.
 Also you can specify your events.
-
 ````javascript
 app.config(['$authConfigProvider', function($authConfigProvider)
 {

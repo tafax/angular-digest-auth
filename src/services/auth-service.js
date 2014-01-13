@@ -32,7 +32,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          *
          * @type {{username: string, password: string, requested: boolean}}
          */
-        var $loginRequest = {
+        var $request = {
             username: '',
             password: '',
             requested: false
@@ -64,18 +64,18 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          * @param {String} username
          * @param {String} password
          */
-        this.setLoginRequest = function(username, password)
+        this.setRequest = function(username, password)
         {
-            $loginRequest = {
+          $request = {
                 username: username,
                 password: password,
                 requested: true
             };
 
             $rootScope.$broadcast($authConfig.getEvent('credential.submitted'), {
-                username: $loginRequest.username,
-                password: $loginRequest.password,
-                requested: $loginRequest.requested
+                username: $request.username,
+                password: $request.password,
+                requested: $request.requested
             });
         };
 
@@ -84,9 +84,9 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          *
          * @returns {{username: string, password: string, requested: boolean}}
          */
-        this.getLoginRequest = function()
+        this.getRequest = function()
         {
-            return $loginRequest;
+            return $request;
         };
 
         /**
@@ -94,9 +94,9 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          *
          * @returns {boolean}
          */
-        this.isLoginRequested = function()
+        this.isRequested = function()
         {
-            return $loginRequest.requested;
+            return $request.requested;
         };
 
         /**
@@ -119,8 +119,8 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
             if(!$authStorage.hasCredential() || !$clientAuth.isConfigured())
                 return false;
 
-            $loginRequest.username = $authStorage.getUsername();
-            $loginRequest.password = $authStorage.getPassword();
+            $request.username = $authStorage.getUsername();
+            $request.password = $authStorage.getPassword();
 
             return true;
         };
@@ -133,60 +133,60 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
         this.processRequest = function(request)
         {
             if($clientAuth.isConfigured())
-                $clientAuth.processRequest($loginRequest.username, $loginRequest.password, request);
+                $clientAuth.processRequest($request.username, $request.password, request);
         };
 
         /**
-         * Performs the sign in.
+         * Performs the login.
          */
         this.signin = function()
         {
-            console.debug('Performs a sign in.');
+            console.debug('Performs a login.');
 
             $http.post($authConfig.getSign().signin, $authConfig.getSign().config)
                 .success(function(data)
                 {
-                    console.debug('Sign in successful.');
+                    console.debug('Login successful.');
 
                     $identity = angular.extend({
-                        username: $loginRequest.username
+                        username: $request.username
                     }, data);
 
                     $cookies['_auth'] = md5.createHash('true');
 
-                    if($loginRequest.requested)
+                    if($request.requested)
                     {
-                        $authStorage.setCredential($loginRequest.username, $loginRequest.password);
+                        $authStorage.setCredential($request.username, $request.password);
                         $rootScope.$broadcast($authConfig.getEvent('credential.stored'), {
-                            username: $loginRequest.username,
-                            password: $loginRequest.password
+                            username: $request.username,
+                            password: $request.password
                         });
 
-                        $loginRequest.requested = false;
+                        $request.requested = false;
                     }
 
                     $rootScope.$broadcast($authConfig.getEvent('signin.successful'), data);
                 })
                 .error(function(data, status)
                 {
-                    console.debug('Sign in error.');
+                    console.debug('Login error.');
 
-                    $loginRequest = null;
+                    $request = null;
                     $rootScope.$broadcast($authConfig.getEvent('signin.error'), data, status);
                 });
         };
 
         /**
-         * Performs the sign out.
+         * Performs the logout.
          */
         this.signout = function()
         {
-            console.debug('Performs a sign out.');
+            console.debug('Performs a logout.');
 
             $http.post($authConfig.getSign().signout, $authConfig.getSign().config)
                 .success(function(data)
                 {
-                    console.debug('Sign out successful.');
+                    console.debug('Logout successful.');
 
                     $cookies['_auth'] = md5.createHash('false');
                     $identity = null;
@@ -194,7 +194,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
                 })
                 .error(function(data, status)
                 {
-                    console.debug('Sign out error.');
+                    console.debug('Logout error.');
 
                     $rootScope.$broadcast($authConfig.getEvent('signout.error'), data, status);
                 });

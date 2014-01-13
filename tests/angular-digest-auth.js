@@ -108,7 +108,7 @@ describe('angular-digest-auth', function()
                 requested: true
             };
 
-            $authService.setLoginRequest(login.username, login.password);
+            $authService.setRequest(login.username, login.password);
 
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();
@@ -135,7 +135,7 @@ describe('angular-digest-auth', function()
                 requested: true
             };
 
-            $authService.setLoginRequest(login.username, login.password);
+            $authService.setRequest(login.username, login.password);
 
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();
@@ -163,12 +163,12 @@ describe('angular-digest-auth', function()
                 requested: true
             };
 
-            $authService.setLoginRequest(login.username, login.password);
+            $authService.setRequest(login.username, login.password);
 
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();
 
-            $authService.setLoginRequest('fake', 'fake');
+            $authService.setRequest('fake', 'fake');
 
             $authService.signout();
 
@@ -191,7 +191,7 @@ describe('angular-digest-auth', function()
                 requested: true
             };
 
-            $authService.setLoginRequest(login.username, login.password);
+            $authService.setRequest(login.username, login.password);
 
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();

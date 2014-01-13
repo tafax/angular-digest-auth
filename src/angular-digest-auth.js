@@ -77,7 +77,7 @@ function($rootScope, $authConfig, $authService, $serverAuth, $http)
 
     var resendRequests = function()
     {
-        console.debug('Request another sign in.');
+        console.debug('Request another login.');
 
         for(var i=0; i<$rootScope.requests401.length; i++)
         {
@@ -101,7 +101,7 @@ function($rootScope, $authConfig, $authService, $serverAuth, $http)
 
     $rootScope.$on($authConfig.getEvent('process.response'), function(event, response)
     {
-        if($authService.isLoginRequested())
+        if($authService.isRequested())
             response.login = true;
     });
 

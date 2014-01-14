@@ -124,7 +124,7 @@ module.exports = function(grunt)
     grunt.registerTask('test', ['karma:build']);
 
     // Travis task.
-    grunt.registerTask('travis', ['karma:travis']);
+    grunt.registerTask('travis', ['bower', 'karma:travis']);
 
     // Build task.
     grunt.registerTask('build', ['test', 'concat', 'removelogging', 'uglify']);

@@ -3,7 +3,7 @@
 /**
  * Manages the configuration for the auth module.
  */
-dgAuth.provider('$authConfig', function()
+dgAuth.provider('$authConfig', function AuthConfigProvider()
 {
     /**
      * AuthConfig provides a service to get
@@ -145,7 +145,7 @@ dgAuth.provider('$authConfig', function()
     /**
      * Gets AuthConfig service.
      *
-     * @returns {AuthConfig}
+     * @returns {AuthConfigProvider.AuthConfig}
      */
     this.$get = function()
     {

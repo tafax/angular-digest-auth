@@ -34,10 +34,15 @@
     "url": "https://github.com/tafax/angular-digest-auth/issues"
   },
   "scripts": {
-    "test": "test"
+    "test": "grunt travis --verbose"
   },
   "keywords": [
-    "angular"
+    "angular",
+    "http digest",
+    "digest",
+    "authentication",
+    "login",
+    "app"
   ],
   "license": "MIT"
 }

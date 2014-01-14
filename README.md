@@ -1,4 +1,4 @@
-#AngularJS HTTP Digest Authentication
+#AngularJS HTTP Digest Authentication [![Build Status](https://travis-ci.org/tafax/angular-digest-auth.png?branch=master)](https://travis-ci.org/tafax/angular-digest-auth)
 It is an AngularJS module to manage HTTP Digest Authentication. It provides basic functionality
 to sign in and sign out. It automatically manages the synchronization between the client and the
 server after the user did the login.

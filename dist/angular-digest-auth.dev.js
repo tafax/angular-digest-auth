@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.1.0 - 2014-01-13
+ * @version v0.1.0 - 2014-01-14
  * @link https://github.com/mgonto/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -271,7 +271,7 @@ function($rootScope, $serverAuth, md5)
 /**
  * Manages the configuration for the auth module.
  */
-dgAuth.provider('$authConfig', function()
+dgAuth.provider('$authConfig', function AuthConfigProvider()
 {
     /**
      * AuthConfig provides a service to get
@@ -413,7 +413,7 @@ dgAuth.provider('$authConfig', function()
     /**
      * Gets AuthConfig service.
      *
-     * @returns {AuthConfig}
+     * @returns {AuthConfigProvider.AuthConfig}
      */
     this.$get = function()
     {

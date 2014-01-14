@@ -64,7 +64,10 @@ app.run(['$authConfig', '$authService', function($authConfig, $authService)
 
     $authService.$on($authConfig.getEvent('signin.required'), function(event)
     {
-        //Redirect user to your login page. Ex: $location.path('/path/to/login');
+        if(!event.defaultPrevented)
+        {
+            //Redirect user to your login page. Ex: $location.path('/path/to/login');
+        }
     });
 
     $authService.$on($authConfig.getEvent('signin.successful'), function(event, data)

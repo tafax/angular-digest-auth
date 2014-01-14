@@ -1,11 +1,24 @@
-AngularJS HTTP Digest Authentication
-===================
+#AngularJS HTTP Digest Authentication
 It is an AngularJS module to manage HTTP Digest Authentication. It provides basic functionality
 to sign in and sign out. It automatically manages the synchronization between the client and the
 server after the user did the login.
 
-Configuration
-===================
+#Installation
+You can download this by:
+* Using bower and running `bower install angular-digest-auth --save` (recommended)
+* Downloading manually the [unminified version](https://raw.github.com/tafax/angular-digest-auth/master/dist/angular-digest-auth.js) or
+the [minified production version](https://raw.github.com/tafax/angular-digest-auth/master/dist/angular-digest-auth.min.js)
+
+Import the module in your app.
+````javascript
+var app = angular.module('myApp', ['dgAuth']);
+````
+
+#Dependencies
+This module depends on [angular](https://github.com/angular/angular.js), [angular-cookies](https://github.com/angular/bower-angular-cookies)
+and [angular-md5](https://github.com/gdi2290/angular-md5).
+
+#Configuration
 How to configure the urls to sing in and sign out.
 ````javascript
 app.config(['$authConfigProvider', function($authConfigProvider)
@@ -41,8 +54,7 @@ app.config(['$authStorageProvider', function($authStorageProvider)
 
 Obviously, if you want to specify your own storage object, you can :).
 
-Usage
-===================
+#Usage
 For basic usage, you can launch the `signin()` when your app goes run. Then, you can handle two events: `signin.required`
 and `signin.successful`.
 ````javascript
@@ -72,8 +84,7 @@ $scope.submit = function(user)
 
 After this, the service performs a login again without doing any more.
 
-Events
-===================
+#Events
 The module uses several events to provide its functionality. You can use the list of all events to handle
 the module environment.
 ````javascript
@@ -118,6 +129,5 @@ app.config(['$authConfigProvider', function($authConfigProvider)
 }]);
 ````
 
-License
-===================
-[MIT](../blob/master/LICENSE)
+#License
+[MIT](https://github.com/tafax/angular-digest-auth/blob/master/LICENSE)

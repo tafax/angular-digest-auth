@@ -80,6 +80,11 @@ module.exports = function(grunt)
             build: {
                 singleRun: true,
                 autoWatch: false
+            },
+            travis: {
+                singleRun: true,
+                autoWatch: false,
+                browsers: ['Firefox']
             }
         },
         bump: {
@@ -117,6 +122,9 @@ module.exports = function(grunt)
 
     // Test task.
     grunt.registerTask('test', ['karma:build']);
+
+    // Travis task.
+    grunt.registerTask('travis', ['karma:travis']);
 
     // Build task.
     grunt.registerTask('build', ['test', 'concat', 'removelogging', 'uglify']);

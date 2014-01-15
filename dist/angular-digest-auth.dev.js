@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.1.0 - 2014-01-14
+ * @version v0.1.2 - 2014-01-15
  * @link https://github.com/mgonto/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -99,6 +99,8 @@ function($rootScope, $authConfig, $authService, $serverAuth, $http)
                 request.deferred.reject(response);
             });
         }
+
+        $rootScope.requests401 = [];
     };
 
     $rootScope.$on($authConfig.getEvent('process.request'), function(event, request)
@@ -130,7 +132,11 @@ function($rootScope, $authConfig, $authService, $serverAuth, $http)
     $rootScope.$on($authConfig.getEvent('credential.submitted'), function(event, credential)
     {
         console.debug('Submitted credential.');
-        resendRequests();
+
+        if($rootScope.requests401.length == 0)
+            $authService.signin();
+        else
+            resendRequests();
     });
 }]);
 /**
@@ -520,7 +526,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          *
          * @type {Object}
          */
-        var $identity;
+        var $identity = null;
 
         /**
          * The request used to sing in user.

@@ -92,6 +92,8 @@ function($rootScope, $authConfig, $authService, $serverAuth, $http)
                 request.deferred.reject(response);
             });
         }
+
+        $rootScope.requests401 = [];
     };
 
     $rootScope.$on($authConfig.getEvent('process.request'), function(event, request)
@@ -123,6 +125,10 @@ function($rootScope, $authConfig, $authService, $serverAuth, $http)
     $rootScope.$on($authConfig.getEvent('credential.submitted'), function(event, credential)
     {
         console.debug('Submitted credential.');
-        resendRequests();
+
+        if($rootScope.requests401.length == 0)
+            $authService.signin();
+        else
+            resendRequests();
     });
 }]);

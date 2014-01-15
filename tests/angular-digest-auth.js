@@ -90,7 +90,7 @@ describe('angular-digest-auth', function()
 
     describe('ALL', function()
     {
-        it('performs the sign in - error', function()
+        it('performs the login - error', function()
         {
             $authService.signin();
 
@@ -117,7 +117,29 @@ describe('angular-digest-auth', function()
             expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.error'), jasmine.any(String), jasmine.any(Number));
         });
 
-        it('performs the sing in - successful', function()
+        it('multiple login error', function()
+        {
+            $authService.signin();
+
+            $httpBackend.expectPOST($authConfig.getSign().signin);
+            $httpBackend.flush();
+
+            $authService.setRequest('fake', 'fake');
+
+            $httpBackend.expectPOST($authConfig.getSign().signin);
+            $httpBackend.flush();
+
+            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.error'), jasmine.any(String), jasmine.any(Number));
+
+            $authService.setRequest('fake', 'fake');
+
+            $httpBackend.expectPOST($authConfig.getSign().signin);
+            $httpBackend.flush();
+
+            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.error'), jasmine.any(String), jasmine.any(Number));
+        });
+
+        it('performs the login - successful', function()
         {
             $authService.signin();
 
@@ -150,7 +172,7 @@ describe('angular-digest-auth', function()
             expect($authService.hasIdentity()).toEqual(true);
         });
 
-        it('performs the sign out - error', function()
+        it('performs the logout - error', function()
         {
             $authService.signin();
 
@@ -178,7 +200,7 @@ describe('angular-digest-auth', function()
             expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signout.error'), jasmine.any(String), jasmine.any(Number));
         });
 
-        it('performs the sign out - successful', function()
+        it('performs the logout - successful', function()
         {
             $authService.signin();
 

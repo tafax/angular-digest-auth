@@ -25,7 +25,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          *
          * @type {Object}
          */
-        var $identity;
+        var $identity = null;
 
         /**
          * The request used to sing in user.

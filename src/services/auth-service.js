@@ -1,15 +1,7 @@
 /**
  * Used to manage the authentication.
  */
-dgAuth.factory('$authService', [
-    '$authConfig',
-    '$authStorage',
-    '$clientAuth',
-    '$rootScope',
-    '$http',
-    '$cookies',
-    'md5',
-function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md5)
+dgAuth.provider('$authService', [function AuthServiceProvider()
 {
     /**
      * Creates the authentication service to performs
@@ -18,8 +10,15 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
      *
      * @constructor
      */
-    function AuthService()
+    function AuthService(config, $authConfig, $authStorage, $clientAuth, $rootScope, $http, $q, $cookies, md5)
     {
+        var $deferred = null;
+
+        var $signin = config.signin;
+        var $signout = config.signout;
+        var $callbacks = config.callbacks;
+        var $automatic = config.automatic;
+
         /**
          * The current identity
          *
@@ -66,16 +65,15 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          */
         this.setRequest = function(username, password)
         {
-          $request = {
+            angular.extend($request, {
                 username: username,
                 password: password,
                 requested: true
-            };
+            });
 
             $rootScope.$broadcast($authConfig.getEvent('credential.submitted'), {
                 username: $request.username,
-                password: $request.password,
-                requested: $request.requested
+                password: $request.password
             });
         };
 
@@ -106,6 +104,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          */
         this.isAuthenticated = function()
         {
+            // TODO: aggiungere il check con le promise
             return ($cookies['_auth'] == md5.createHash('true') && null !== $identity);
         };
 
@@ -136,14 +135,11 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
                 $clientAuth.processRequest($request.username, $request.password, request);
         };
 
-        /**
-         * Performs the login.
-         */
-        this.signin = function()
+        var performSignin = function()
         {
-            console.debug('Performs a login.');
+            var deferred = $q.defer();
 
-            $http.post($authConfig.getSign().signin, $authConfig.getSign().config)
+            $http($signin)
                 .success(function(data)
                 {
                     console.debug('Login successful.');
@@ -157,6 +153,7 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
                     if($request.requested)
                     {
                         $authStorage.setCredential($request.username, $request.password);
+
                         $rootScope.$broadcast($authConfig.getEvent('credential.stored'), {
                             username: $request.username,
                             password: $request.password
@@ -166,6 +163,8 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
                     }
 
                     $rootScope.$broadcast($authConfig.getEvent('signin.successful'), data);
+
+                    deferred.resolve(data);
                 })
                 .error(function(data, status)
                 {
@@ -173,7 +172,27 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
 
                     $request = null;
                     $rootScope.$broadcast($authConfig.getEvent('signin.error'), data, status);
+
+                    deferred.reject(data);
                 });
+
+            return deferred;
+        };
+
+        /**
+         * Performs the login.
+         */
+        this.signin = function()
+        {
+            console.debug('Performs a login.');
+
+            if($cookies['_auth'] == md5.createHash('true') && $automatic)
+            {
+                // TODO: caricare le credenziali dallo storage
+            }
+
+            $deferred = performSignin();
+            $deferred.promise.then($callbacks.login.successful, $callbacks.login.error);
         };
 
         /**
@@ -201,6 +220,86 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
         };
     }
 
-    return new AuthService();
+    var $automatic = true;
+
+    this.setAutomatic = function(automatic)
+    {
+        $automatic = automatic;
+    };
+
+    this.getAutomatic = function()
+    {
+        return $automatic;
+    };
+
+    var $signin = {
+        method: 'POST',
+        url: '/signin'
+    };
+
+    this.setSignin = function(signin)
+    {
+        angular.extend($signin, signin);
+    };
+
+    this.getSignin = function()
+    {
+        return $signin;
+    };
+
+    var $signout = {
+        method: 'POST',
+        url: '/signout'
+    };
+
+    this.setSignout = function(signout)
+    {
+       angular.extend($signout, signout);
+    };
+
+    this.getSignout = function()
+    {
+        return $signout;
+    };
+
+    var $callbacks = {
+        login: {
+            successful: function(){},
+            error: function(){}
+        },
+        logout: {
+            successful: function(){},
+            error: function(){}
+        }
+    };
+
+    this.setCallbacks = function(callbacks)
+    {
+        angular.extend($callbacks, callbacks);
+    };
+
+    this.getCallbacks = function()
+    {
+        return $callbacks;
+    };
+
+    this.$get = [
+        '$authConfig',
+        '$authStorage',
+        '$clientAuth',
+        '$rootScope',
+        '$http',
+        '$q',
+        '$cookies',
+        'md5',
+    function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $q, $cookies, md5)
+    {
+        return new AuthService({
+            signin: $signin,
+            signout: $signout,
+            callbacks: $callbacks,
+            automatic: $automatic
+        }, $authConfig, $authStorage, $clientAuth, $rootScope, $http, $q, $cookies, md5);
+    }];
 
 }]);

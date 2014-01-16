@@ -104,11 +104,16 @@ describe('angular-digest-auth', function()
 
             var login = {
                 username: 'fake',
-                password: 'fake',
-                requested: true
+                password: 'fake'
             };
 
-            $authService.setRequest(login.username, login.password);
+            $authService.setCredentials(login.username, login.password);
+            $authService.signin();
+
+            $authService.isAuthenticated().then(null, function()
+            {
+                expect($authService.hasIdentity()).toEqual(false);
+            });
 
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();
@@ -124,19 +129,49 @@ describe('angular-digest-auth', function()
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();
 
-            $authService.setRequest('fake', 'fake');
+            $authService.setCredentials('fake', 'fake');
+            $authService.signin();
+
+            $authService.isAuthenticated().then(null, function()
+            {
+                expect($authService.hasIdentity()).toEqual(false);
+            });
 
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();
 
             expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.error'), jasmine.any(String), jasmine.any(Number));
 
-            $authService.setRequest('fake', 'fake');
+            $authService.setCredentials('fake', 'fake');
+            $authService.signin();
+
+            $authService.isAuthenticated().then(null, function()
+            {
+                expect($authService.hasIdentity()).toEqual(false);
+            });
 
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();
 
             expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.error'), jasmine.any(String), jasmine.any(Number));
+
+            $authService.setCredentials('test', 'test');
+            $authService.signin();
+
+            $authService.isAuthenticated().then(function()
+            {
+                expect($authService.hasIdentity()).toEqual(true);
+            });
+
+            $httpBackend.expectPOST($authConfig.getSign().signin);
+            $httpBackend.flush();
+
+            $authService.isAuthenticated().then(function()
+            {
+                expect($authService.hasIdentity()).toEqual(true);
+            });
+
+            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.successful'), jasmine.any(String));
         });
 
         it('performs the login - successful', function()
@@ -153,11 +188,16 @@ describe('angular-digest-auth', function()
 
             var login = {
                 username: 'test',
-                password: 'test',
-                requested: true
+                password: 'test'
             };
 
-            $authService.setRequest(login.username, login.password);
+            $authService.setCredentials(login.username, login.password);
+            $authService.signin();
+
+            $authService.isAuthenticated().then(function()
+            {
+                expect($authService.hasIdentity()).toEqual(true);
+            });
 
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();
@@ -168,8 +208,6 @@ describe('angular-digest-auth', function()
                 password: login.password
             });
             expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.successful'), jasmine.any(String));
-
-            expect($authService.hasIdentity()).toEqual(true);
         });
 
         it('performs the logout - error', function()
@@ -181,18 +219,27 @@ describe('angular-digest-auth', function()
 
             var login = {
                 username: 'test',
-                password: 'test',
-                requested: true
+                password: 'test'
             };
 
-            $authService.setRequest(login.username, login.password);
+            $authService.setCredentials(login.username, login.password);
+            $authService.signin();
+
+            $authService.isAuthenticated().then(function()
+            {
+                expect($authService.hasIdentity()).toEqual(true);
+            });
 
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();
 
-            $authService.setRequest('fake', 'fake');
-
+            $authService.setCredentials('fake', 'fake');
             $authService.signout();
+
+            $authService.isAuthenticated().then(function()
+            {
+                expect($authService.hasIdentity()).toEqual(true);
+            });
 
             $httpBackend.expectPOST($authConfig.getSign().signout);
             $httpBackend.flush();
@@ -209,16 +256,21 @@ describe('angular-digest-auth', function()
 
             var login = {
                 username: 'test',
-                password: 'test',
-                requested: true
+                password: 'test'
             };
 
-            $authService.setRequest(login.username, login.password);
+            $authService.setCredentials(login.username, login.password);
+            $authService.signin();
 
             $httpBackend.expectPOST($authConfig.getSign().signin);
             $httpBackend.flush();
 
             $authService.signout();
+
+            $authService.isAuthenticated().then(null, function()
+            {
+                expect($authService.hasIdentity()).toEqual(false);
+            });
 
             $httpBackend.expectPOST($authConfig.getSign().signout);
             $httpBackend.flush();

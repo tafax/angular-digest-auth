@@ -26,7 +26,7 @@ dgAuth.provider('$authStorage', function AuthStorageProvider()
             return ((null !== username && null !== password));
         };
 
-        this.setCredential = function(username, password)
+        this.setCredentials = function(username, password)
         {
             $storage.setItem('username', username);
             $storage.setItem('password', password);

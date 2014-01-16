@@ -30,7 +30,7 @@ dgAuth.config(['$httpProvider', function($httpProvider)
                 {
                     $rootScope.$broadcast($authConfig.getEvent('process.response'), rejection);
 
-                    if(rejection.login)
+                    if(rejection.mustTerminate)
                         return $q.reject(rejection);
 
                     console.debug("Server has requested an authentication.");
@@ -69,66 +69,28 @@ dgAuth.run([
     '$rootScope',
     '$authConfig',
     '$authService',
+    '$clientAuth',
     '$serverAuth',
-    '$http',
-function($rootScope, $authConfig, $authService, $serverAuth, $http)
+function($rootScope, $authConfig, $authService, $clientAuth, $serverAuth)
 {
-    $rootScope.requests401 = [];
-
-    var resendRequests = function()
-    {
-        console.debug('Request another login.');
-
-        for(var i=0; i<$rootScope.requests401.length; i++)
-        {
-            var request = $rootScope.requests401[i];
-
-            $http(request.config).then(function(response)
-            {
-                request.deferred.resolve(response);
-            },
-            function(response)
-            {
-                request.deferred.reject(response);
-            });
-        }
-
-        $rootScope.requests401 = [];
-    };
-
     $rootScope.$on($authConfig.getEvent('process.request'), function(event, request)
     {
-        $authService.processRequest(request);
+        if($clientAuth.isConfigured())
+        {
+            var login = $authService.getCredentials();
+
+            $clientAuth.processRequest(login.username, login.password, request);
+        }
     });
 
     $rootScope.$on($authConfig.getEvent('process.response'), function(event, response)
     {
-        if($authService.isRequested())
-            response.login = true;
+        $authService.mustTerminate(response);
     });
 
     $rootScope.$on($authConfig.getEvent('authentication.header'), function(event, header, request)
     {
-        $rootScope.requests401.push(request);
+        $authService.setRequest(request);
         $serverAuth.parseHeader(header);
-    });
-
-    $rootScope.$on($authConfig.getEvent('signin.required'), function(event)
-    {
-        if($authService.restoreCredential())
-        {
-            event.preventDefault();
-            resendRequests();
-        }
-    });
-
-    $rootScope.$on($authConfig.getEvent('credential.submitted'), function(event, credential)
-    {
-        console.debug('Submitted credential.');
-
-        if($rootScope.requests401.length == 0)
-            $authService.signin();
-        else
-            resendRequests();
     });
 }]);

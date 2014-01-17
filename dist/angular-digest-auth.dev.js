@@ -97,7 +97,7 @@ function($rootScope, $authConfig, $authService, $clientAuth, $serverAuth)
 
     $rootScope.$on($authConfig.getEvent('authentication.header'), function(event, header, request)
     {
-        $authService.setRequest(request);
+        $authService.setHttpRequest(request);
         $serverAuth.parseHeader(header);
     });
 }]);
@@ -213,7 +213,7 @@ function($rootScope, $serverAuth, md5)
          */
         this.isConfigured = function()
         {
-            return $serverAuth.hasHeader();
+            return $serverAuth.isConfigured();
         };
 
         /**
@@ -379,9 +379,9 @@ dgAuth.provider('$authConfig', function AuthConfigProvider()
     };
 
     /**
-     * Gets AuthConfig service.
+     * Gets AuthEvents service.
      *
-     * @returns {AuthConfigProvider.AuthConfig}
+     * @returns {AuthConfigProvider.AuthEvents}
      */
     this.$get = function()
     {
@@ -410,7 +410,7 @@ dgAuth.factory('$serverAuth', ['$authStorage', function($authStorage)
         this.algorithm = "";
         this.qop = "";
 
-        this.hasHeader = function()
+        this.isConfigured = function()
         {
             return $header;
         };
@@ -520,7 +520,7 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
 
         var $logout = initLogout();
 
-        this.setRequest = function(request)
+        this.setHttpRequest = function(request)
         {
             angular.extend($login, {
                 httpRequest: request

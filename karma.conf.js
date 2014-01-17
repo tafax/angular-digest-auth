@@ -20,7 +20,7 @@ module.exports = function(config) {
       'lib/angular-md5/angular-md5.js',
       'src/angular-digest-auth.js',
       'src/services/auth-client.js',
-      'src/services/auth-config.js',
+      'src/services/auth-events.js',
       'src/services/auth-server.js',
       'src/services/auth-service.js',
       'src/services/auth-storage.js',

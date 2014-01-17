@@ -1,52 +1,113 @@
 describe('angular-digest-auth', function()
 {
-    var $regex = /Digest username\=\"([a-z]*)\"/;
-    var $authStorage;
-    var $authConfig;
-    var $authService;
-    var $httpBackend;
-    var $rootScope;
+    var _regex = /Digest username\=\"([a-z]*)\"/;
+    var _authStorage;
+    var _authEvents;
+    var _authService;
+    var _httpBackend;
+    var _rootScope;
+    var _config;
+
+    var _identity = {
+        id: 1
+    };
+
+    var _loginError = {
+        message: 'Login error.'
+    };
+
+    var _logoutError = {
+        message: 'Logout error.'
+    };
 
     beforeEach(angular.mock.module('dgAuth'));
 
     beforeEach(function()
     {
         var fakeModule = angular.module('test.config', []);
-        fakeModule.config(['$authConfigProvider', function($authConfigProvider)
+        fakeModule.config([
+            'authEventsProvider',
+            'authServiceProvider',
+            'authServerProvider',
+        function(authEventsProvider, authServiceProvider, authServerProvider)
         {
-            $authConfigProvider.setSign({
-                signin: '/signin',
-                signout: '/signout'
+            authServiceProvider.setConfig({
+                login: {
+                    method: 'POST',
+                    url: '/signin'
+                },
+                logout: {
+                    method: 'POST',
+                    url: '/signout'
+                }
             });
 
-            $authConfigProvider.setHeader('X-Auth-Digest');
+            authServiceProvider.callbacks.login.push(['authService', function(authService)
+            {
+                return {
+                    successful: function(data)
+                    {
+                        expect(data).toEqual(_identity);
+                        expect(authService.getIdentity()).toEqual(_identity);
+                        expect(authService.hasIdentity()).toEqual(true);
+                    },
+                    error: function(error)
+                    {
+                        expect(error).toEqual(_loginError);
+                        expect(authService.getIdentity()).toEqual(null);
+                        expect(authService.hasIdentity()).toEqual(false);
+                    }
+                };
+            }]);
+
+            authServiceProvider.callbacks.logout.push(['authService', function(authService)
+            {
+                return {
+                    successful: function(data)
+                    {
+                        expect(data).toEqual('');
+                        expect(authService.getIdentity()).toEqual(null);
+                        expect(authService.hasIdentity()).toEqual(false);
+                    },
+                    error: function(error)
+                    {
+                        expect(error).toEqual(_logoutError);
+                        expect(authService.getIdentity()).toEqual(_identity);
+                        expect(authService.hasIdentity()).toEqual(true);
+                    }
+                };
+            }]);
+
+            authServerProvider.setHeader('X-Auth-Digest');
         }]);
 
         module('dgAuth', 'test.config');
 
         inject(function($injector)
         {
-            $rootScope = $injector.get('$rootScope');
-            spyOn($rootScope, '$broadcast').andCallThrough();
+            _rootScope = $injector.get('$rootScope');
+            spyOn(_rootScope, '$broadcast').andCallThrough();
 
-            $authConfig = $injector.get('$authConfig');
-            $authService = $injector.get('$authService');
+            _authEvents = $injector.get('authEvents');
+            _authService = $injector.get('authService');
 
-            $authStorage = $injector.get('$authStorage');
-            $authStorage.clear();
+            _authStorage = $injector.get('authStorage');
+            _authStorage.clear();
 
-            $httpBackend = $injector.get('$httpBackend');
-            $httpBackend.whenPOST($authConfig.getSign().signin).respond(function(method, url, data, headers)
+            _config = _authService.getConfig();
+
+            _httpBackend = $injector.get('$httpBackend');
+            _httpBackend.whenPOST(_config.login.url).respond(function(method, url, data, headers)
             {
                 var authorization = headers.Authorization;
                 if(authorization)
                 {
-                    var regex = new RegExp($regex);
+                    var regex = new RegExp(_regex);
                     var username = regex.exec(authorization);
 
                     if(username[1] == 'test')
                     {
-                        return [201, '', ''];
+                        return [201, JSON.stringify(_identity), ''];
                     }
                 }
 
@@ -60,15 +121,15 @@ describe('angular-digest-auth', function()
                         'qop="auth"'
                 };
 
-                return [401, '', responseHeaders];
+                return [401, JSON.stringify(_loginError), responseHeaders];
             });
 
-            $httpBackend.whenPOST($authConfig.getSign().signout).respond(function(method, url, data, headers)
+            _httpBackend.whenPOST(_config.logout.url).respond(function(method, url, data, headers)
             {
                 var authorization = headers.Authorization;
                 if(authorization)
                 {
-                    var regex = new RegExp($regex);
+                    var regex = new RegExp(_regex);
                     var username = regex.exec(authorization);
 
                     if(username[1] == 'test')
@@ -77,153 +138,205 @@ describe('angular-digest-auth', function()
                     }
                 }
 
-                return [400, '', headers];
+                return [400, JSON.stringify(_logoutError), headers];
             });
         });
     });
 
     afterEach(function()
     {
-        $httpBackend.verifyNoOutstandingExpectation();
-        $httpBackend.verifyNoOutstandingRequest();
+        _httpBackend.verifyNoOutstandingExpectation();
+        _httpBackend.verifyNoOutstandingRequest();
     });
 
     describe('ALL', function()
     {
         it('performs the login - error', function()
         {
-            $authService.signin();
+            _authService.signin();
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
 
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('process.request'), jasmine.any(Object));
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('process.response'), jasmine.any(Object));
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('authentication.header'), jasmine.any(String), jasmine.any(Object));
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.required'));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('process.request'), jasmine.any(Object));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('process.response'), jasmine.any(Object));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('authentication.header'), jasmine.any(Object));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.required'));
 
             var login = {
                 username: 'fake',
-                password: 'fake',
-                requested: true
+                password: 'fake'
             };
 
-            $authService.setRequest(login.username, login.password);
+            _authService.setCredentials(login.username, login.password);
+            _authService.signin();
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _authService.isAuthenticated().then(null, function()
+            {
+                expect(_authService.hasIdentity()).toEqual(false);
+            });
 
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('credential.submitted'), login);
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.error'), jasmine.any(String), jasmine.any(Number));
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
+
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('credential.submitted'), login);
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.error'), _loginError, jasmine.any(Number));
         });
 
         it('multiple login error', function()
         {
-            $authService.signin();
+            _authService.signin();
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
 
-            $authService.setRequest('fake', 'fake');
+            _authService.setCredentials('fake', 'fake');
+            _authService.signin();
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _authService.isAuthenticated().then(null, function()
+            {
+                expect(_authService.hasIdentity()).toEqual(false);
+            });
 
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.error'), jasmine.any(String), jasmine.any(Number));
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
 
-            $authService.setRequest('fake', 'fake');
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.error'), _loginError, jasmine.any(Number));
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _authService.setCredentials('fake', 'fake');
+            _authService.signin();
 
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.error'), jasmine.any(String), jasmine.any(Number));
+            _authService.isAuthenticated().then(null, function()
+            {
+                expect(_authService.hasIdentity()).toEqual(false);
+            });
+
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
+
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.error'), _loginError, jasmine.any(Number));
+
+            _authService.setCredentials('test', 'test');
+            _authService.signin();
+
+            _authService.isAuthenticated().then(function()
+            {
+                expect(_authService.hasIdentity()).toEqual(true);
+            });
+
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
+
+            _authService.isAuthenticated().then(function()
+            {
+                expect(_authService.hasIdentity()).toEqual(true);
+            });
+
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.successful'), _identity);
         });
 
         it('performs the login - successful', function()
         {
-            $authService.signin();
+            _authService.signin();
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
 
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('process.request'), jasmine.any(Object));
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('process.response'), jasmine.any(Object));
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('authentication.header'), jasmine.any(String), jasmine.any(Object));
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.required'));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('process.request'), jasmine.any(Object));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('process.response'), jasmine.any(Object));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('authentication.header'), jasmine.any(Object));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.required'));
 
             var login = {
                 username: 'test',
-                password: 'test',
-                requested: true
+                password: 'test'
             };
 
-            $authService.setRequest(login.username, login.password);
+            _authService.setCredentials(login.username, login.password);
+            _authService.signin();
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _authService.isAuthenticated().then(function()
+            {
+                expect(_authService.hasIdentity()).toEqual(true);
+            });
 
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('credential.submitted'), login);
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('credential.stored'), {
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
+
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('credential.submitted'), login);
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('credential.stored'), {
                 username: login.username,
                 password: login.password
             });
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signin.successful'), jasmine.any(String));
-
-            expect($authService.hasIdentity()).toEqual(true);
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.successful'), _identity);
         });
 
         it('performs the logout - error', function()
         {
-            $authService.signin();
+            _authService.signin();
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
 
             var login = {
                 username: 'test',
-                password: 'test',
-                requested: true
+                password: 'test'
             };
 
-            $authService.setRequest(login.username, login.password);
+            _authService.setCredentials(login.username, login.password);
+            _authService.signin();
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _authService.isAuthenticated().then(function()
+            {
+                expect(_authService.hasIdentity()).toEqual(true);
+            });
 
-            $authService.setRequest('fake', 'fake');
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
 
-            $authService.signout();
+            _authService.setCredentials('fake', 'fake');
+            _authService.signout();
 
-            $httpBackend.expectPOST($authConfig.getSign().signout);
-            $httpBackend.flush();
+            _authService.isAuthenticated().then(function()
+            {
+                expect(_authService.hasIdentity()).toEqual(true);
+            });
 
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signout.error'), jasmine.any(String), jasmine.any(Number));
+            _httpBackend.expectPOST(_config.logout.url);
+            _httpBackend.flush();
+
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signout.error'), _logoutError, jasmine.any(Number));
         });
 
         it('performs the logout - successful', function()
         {
-            $authService.signin();
+            _authService.signin();
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
 
             var login = {
                 username: 'test',
-                password: 'test',
-                requested: true
+                password: 'test'
             };
 
-            $authService.setRequest(login.username, login.password);
+            _authService.setCredentials(login.username, login.password);
+            _authService.signin();
 
-            $httpBackend.expectPOST($authConfig.getSign().signin);
-            $httpBackend.flush();
+            _httpBackend.expectPOST(_config.login.url);
+            _httpBackend.flush();
 
-            $authService.signout();
+            _authService.signout();
 
-            $httpBackend.expectPOST($authConfig.getSign().signout);
-            $httpBackend.flush();
+            _authService.isAuthenticated().then(null, function()
+            {
+                expect(_authService.hasIdentity()).toEqual(false);
+            });
 
-            expect($rootScope.$broadcast).toHaveBeenCalledWith($authConfig.getEvent('signout.successful'), jasmine.any(String));
+            _httpBackend.expectPOST(_config.logout.url);
+            _httpBackend.flush();
+
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signout.successful'), jasmine.any(String));
         });
     });
 });

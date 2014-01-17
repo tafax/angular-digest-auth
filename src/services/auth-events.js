@@ -1,34 +1,26 @@
 'use strict';
 
 /**
- * Manages the configuration for the auth module.
+ * Manages the events for the auth module.
  */
-dgAuth.provider('$authConfig', function AuthConfigProvider()
+dgAuth.provider('authEvents', function AuthEventsProvider()
 {
     /**
-     * AuthConfig provides a service to get
+     * AuthEvents provides a service to get
      * basic configuration
      *
-     * @param {Object} sign Object to represent sign in, sign out urls and configuration.
      * @param {Object} events Object to represent all events.
-     * @param {String} header Specifies header to get authentication string from the server response.
      * @constructor
      */
-    function AuthConfig(sign, events, header)
+    function AuthEvents(events)
     {
-        var $sign = sign;
-        var $events = events;
-        var $header = header;
-
         /**
-         * Gets the sign object.
+         * The events of module.
          *
-         * @returns {Object}
+         * @type {Object}
+         * @private
          */
-        this.getSign = function()
-        {
-            return $sign;
-        };
+        var _events = events;
 
         /**
          * Gets all events.
@@ -37,7 +29,7 @@ dgAuth.provider('$authConfig', function AuthConfigProvider()
          */
         this.getEvents = function()
         {
-            return $events;
+            return _events;
         };
 
         /**
@@ -51,39 +43,20 @@ dgAuth.provider('$authConfig', function AuthConfigProvider()
         {
             var split = event.split('.');
 
-            return $events[split[0]][split[1]];
-        };
-
-        /**
-         * Gets the header.
-         *
-         * @returns {String}
-         */
-        this.getHeader = function()
-        {
-            return $header;
+            return _events[split[0]][split[1]];
         };
     }
-
-    /**
-     * The sign object.
-     *
-     * @type {{signin: string, signout: string, config: {}}}
-     */
-    var $sign = {
-        signin: '',
-        signout: '',
-        config: {}
-    };
 
     /**
      * All events in the module.
      *
      * @type {{authentication: {header: string}, process: {request: string, response: string}, signin: {successful: string, error: string, required: string}, signout: {successful: string, error: string}, credential: {submitted: string, stored: string, restored: string}}}
      */
-    var $events = {
+    var _events = {
         authentication: {
-            header: '$authAuthenticationHeader'
+            headerNotFound: '$authAuthenticationHeaderNotFound',
+            header: '$authAuthenticationHeader',
+            request: '$authAuthenticationRequest'
         },
         process: {
             request: '$authProcessRequest',
@@ -106,49 +79,22 @@ dgAuth.provider('$authConfig', function AuthConfigProvider()
     };
 
     /**
-     * The header string.
-     *
-     * @type {string}
-     */
-    var $header = '';
-
-    /**
-     * Sets the sign object by extending basic configuration.
-     *
-     * @param {Object} sign
-     */
-    this.setSign = function(sign)
-    {
-        angular.extend($sign, sign);
-    };
-
-    /**
      * Sets events by extending basic configuration.
      *
      * @param {Object} events
      */
     this.setEvents = function(events)
     {
-        angular.extend($events, events);
+        angular.extend(_events, events);
     };
 
     /**
-     * Sets the header.
+     * Gets AuthEvents service.
      *
-     * @param {String} header
-     */
-    this.setHeader = function(header)
-    {
-        $header = header;
-    };
-
-    /**
-     * Gets AuthConfig service.
-     *
-     * @returns {AuthConfigProvider.AuthConfig}
+     * @returns {AuthEventsProvider.AuthEvents}
      */
     this.$get = function()
     {
-        return new AuthConfig($sign, $events, $header);
+        return new AuthEvents(_events);
     };
 });

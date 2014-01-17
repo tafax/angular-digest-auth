@@ -50,7 +50,7 @@ dgAuth.provider('authEvents', function AuthEventsProvider()
     /**
      * All events in the module.
      *
-     * @type {{authentication: {header: string}, process: {request: string, response: string}, signin: {successful: string, error: string, required: string}, signout: {successful: string, error: string}, credential: {submitted: string, stored: string, restored: string}}}
+     * @type {{authentication: {header: string}, process: {request: string, response: string}, login: {successful: string, error: string, required: string}, logout: {successful: string, error: string}, credential: {submitted: string, stored: string, restored: string}}}
      */
     var _events = {
         authentication: {
@@ -62,12 +62,12 @@ dgAuth.provider('authEvents', function AuthEventsProvider()
             request: '$authProcessRequest',
             response: '$authProcessResponse'
         },
-        signin: {
+        login: {
             successful: '$authSigninSuccessful',
             error: '$authSigninError',
             required: '$authSigninRequired'
         },
-        signout: {
+        logout: {
             successful: '$authSignoutSuccessful',
             error: '$authSignoutError'
         },

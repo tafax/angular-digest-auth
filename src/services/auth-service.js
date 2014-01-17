@@ -211,7 +211,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
                         password: _loginRequest.password
                     });
 
-                    $rootScope.$broadcast(authEvents.getEvent('signin.successful'), data);
+                    $rootScope.$broadcast(authEvents.getEvent('login.successful'), data);
 
                     angular.extend(_loginRequest, {
                         mustTerminate: false
@@ -223,7 +223,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
                 {
                     console.debug('Login error.');
 
-                    $rootScope.$broadcast(authEvents.getEvent('signin.error'), data, status);
+                    $rootScope.$broadcast(authEvents.getEvent('login.error'), data, status);
 
                     _loginRequest = initLogin();
 
@@ -246,6 +246,11 @@ dgAuth.provider('authService', [function AuthServiceProvider()
                         username: authStorage.getUsername(),
                         password: authStorage.getPassword(),
                         mustTerminate: true
+                    });
+
+                    $rootScope.$broadcast(authEvents.getEvent('credential.restored'), {
+                        username: _loginRequest.username,
+                        password: _loginRequest.password
                     });
                 }
             }
@@ -298,7 +303,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
                     _identity = null;
                     _loginRequest = initLogin();
 
-                    $rootScope.$broadcast(authEvents.getEvent('signout.successful'), data);
+                    $rootScope.$broadcast(authEvents.getEvent('logout.successful'), data);
 
                     deferred.resolve(data);
                 })
@@ -306,7 +311,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
                 {
                     console.debug('Logout error.');
 
-                    $rootScope.$broadcast(authEvents.getEvent('signout.error'), data, status);
+                    $rootScope.$broadcast(authEvents.getEvent('logout.error'), data, status);
 
                     deferred.reject(data);
                 });
@@ -384,7 +389,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
      * @type {boolean}
      * @private
      */
-    var _automatic = true;
+    var _automatic = false;
 
     /**
      * Sets configuration for automatic reconnection.

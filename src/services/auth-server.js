@@ -1,72 +1,125 @@
 /**
  * Parses and provides server information for the authentication.
  */
-dgAuth.factory('$serverAuth', ['$authStorage', function($authStorage)
+dgAuth.provider('authServer', function AuthServerProvider()
 {
     /**
      * Creates the service for the server info.
      *
      * @constructor
      */
-    function ServerAuth()
+    function AuthServer(header, authStorage)
     {
-        var $valuePattern = /([a-zA-Z]+)=\"?([a-zA-Z0-9\/\s]+)\"?/;
-        var $header = false;
+        /**
+         * The header string.
+         *
+         * @type {string}
+         */
+        var _header = header;
 
-        this.realm = "";
-        this.domain = "";
-        this.nonce = "";
-        this.opaque = "";
-        this.algorithm = "";
-        this.qop = "";
+        /**
+         * The regular expression to evaluate server information.
+         *
+         * @type {RegExp}
+         * @private
+         */
+        var _valuePattern = /([a-zA-Z]+)=\"?([a-zA-Z0-9\/\s]+)\"?/;
 
-        this.hasHeader = function()
-        {
-            return $header;
+        /**
+         * True if the header was correctly parsed.
+         *
+         * @type {boolean}
+         * @private
+         */
+        var _configured = false;
+
+        /**
+         * The configuration of server information.
+         *
+         * @type {{realm: string, domain: string, nonce: string, opaque: string, algorithm: string, qop: string}}
+         */
+        this.info = {
+            realm: '',
+            domain: '',
+            nonce: '',
+            opaque: '',
+            algorithm: '',
+            qop: ''
         };
 
-        this.config = function(server)
+        /**
+         * Checks if the header was correctly parsed.
+         *
+         * @returns {boolean}
+         */
+        this.isConfigured = function()
         {
-            this.realm = server.realm;
-            this.domain = server.domain;
-            this.nonce = server.nonce;
-            this.opaque = server.opaque;
-            this.algorithm = server.algorithm;
-            this.qop = server.qop;
-            $header = true;
+            return _configured;
         };
 
-        this.parseHeader = function(headerLine)
+        /**
+         * Sets the configuration manually.
+         *
+         * @param {Object} server The server information.
+         */
+        this.setConfig = function(server)
         {
-            var splitting = headerLine.split(', ');
+            angular.extend(this.info, server);
 
-            for(var i=0; i<splitting.length; i++)
+            _configured = true;
+        };
+
+        /**
+         * Parses header to set the information.
+         *
+         * @param {Object} response The response to login request.
+         */
+        this.parseHeader = function(response)
+        {
+            var header = response.headers(_header);
+
+            if(null !== header)
             {
-                var values = $valuePattern.exec(splitting[i]);
-                this[values[1]] = values[2];
+                var splitting = header.split(', ');
+
+                for(var i=0; i<splitting.length; i++)
+                {
+                    var values = _valuePattern.exec(splitting[i]);
+                    this.info[values[1]] = values[2];
+                }
+
+                authStorage.setServerAuth(this.info);
+                _configured = true;
             }
 
-            $header = true;
-            $authStorage.setServerAuth(this);
+            return _configured;
         };
     }
 
     /**
-     * Creates server info taking
-     * the information from storage
-     * if they are previously saved.
+     * The header string.
      *
-     * @returns {ServerAuth}
+     * @type {string}
      */
-    var getServerAuth = function()
+    var _header = '';
+
+    /**
+     * Sets the header.
+     *
+     * @param {String} header
+     */
+    this.setHeader = function(header)
     {
-        var auth = new ServerAuth();
-
-        if($authStorage.hasServerAuth())
-            auth.config($authStorage.getServerAuth());
-
-        return auth;
+        _header = header;
     };
 
-    return getServerAuth();
-}]);
+    this.$get = ['authStorage', function(authStorage)
+    {
+        var auth = new AuthServer(_header, authStorage);
+
+        if(authStorage.hasServerAuth())
+            auth.setConfig(authStorage.getServerAuth());
+
+        return auth;
+    }];
+});

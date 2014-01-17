@@ -1,11 +1,11 @@
 /**
  * Manages authentication info in the client scope.
  */
-dgAuth.factory('$clientAuth', [
+dgAuth.factory('authClient', [
     '$rootScope',
-    '$serverAuth',
+    'authServer',
     'md5',
-function($rootScope, $serverAuth, md5)
+function($rootScope, authServer, md5)
 {
     /**
      * Creates the service to use information generating
@@ -13,10 +13,23 @@ function($rootScope, $serverAuth, md5)
      *
      * @constructor
      */
-    function ClientAuth()
+    function AuthClient()
     {
-        var $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        var $nc = 0;
+        /**
+         * Chars to select when creating nonce.
+         *
+         * @type {string}
+         * @private
+         */
+        var _chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+        /**
+         * Current counter.
+         *
+         * @type {number}
+         * @private
+         */
+        var _nc = 0;
 
         /**
          * Generates the cnonce with the given length.
@@ -27,11 +40,11 @@ function($rootScope, $serverAuth, md5)
         var generateNonce = function(length)
         {
             var nonce = [];
-            var charsLength = $chars.length;
+            var charsLength = _chars.length;
 
             for (var i = 0; i < length; ++i)
             {
-                nonce.push($chars[Math.random() * charsLength | 0]);
+                nonce.push(_chars[Math.random() * charsLength | 0]);
             }
 
             return nonce.join('');
@@ -44,9 +57,9 @@ function($rootScope, $serverAuth, md5)
          */
         var getNc = function()
         {
-            $nc++;
+            _nc++;
 
-            var zeros = 8 - $nc.toString().length;
+            var zeros = 8 - _nc.toString().length;
 
             var nc = "";
             for(var i=0; i<zeros; i++)
@@ -54,34 +67,34 @@ function($rootScope, $serverAuth, md5)
                 nc += "0";
             }
 
-            return (nc + $nc);
+            return (nc + _nc);
         };
 
         /**
          * Generate the response.
          *
-         * @param username
-         * @param password
-         * @param method Method used for the request.
-         * @param uri Uri of the resource requested.
-         * @param nc The progressive nc.
-         * @param cnonce The cnonce.
+         * @param {String} username The username.
+         * @param {String} password The password.
+         * @param {String} method Method used for the request.
+         * @param {String} uri Uri of the resource requested.
+         * @param {String} nc The progressive nc.
+         * @param {String} cnonce The cnonce.
          * @returns {string}
          */
         var generateResponse = function(username, password, method, uri, nc, cnonce)
         {
-            var ha1 = md5.createHash(username + ":" + $serverAuth.realm + ":" + password);
+            var ha1 = md5.createHash(username + ":" + authServer.info.realm + ":" + password);
             var ha2 = md5.createHash(method + ":" + uri);
-            return md5.createHash(ha1 + ":" + $serverAuth.nonce + ":" + nc + ":" + cnonce + ":" + $serverAuth.qop + ":" + ha2);
+            return md5.createHash(ha1 + ":" + authServer.info.nonce + ":" + nc + ":" + cnonce + ":" + authServer.info.qop + ":" + ha2);
         };
 
         /**
          * Aggregates all information to generate header.
          *
-         * @param username
-         * @param password
-         * @param method Method used for the request.
-         * @param uri Uri of the resource requested.
+         * @param {String} username The username.
+         * @param {String} password The password.
+         * @param {String} method Method used for the request.
+         * @param {String} uri Uri of the resource requested.
          * @returns {string}
          */
         var generateHeader = function(username, password, method, uri)
@@ -91,13 +104,13 @@ function($rootScope, $serverAuth, md5)
 
             return "Digest " +
                 "username=\"" + username + "\", " +
-                "realm=\"" + $serverAuth.realm + "\", " +
-                "nonce=\"" + $serverAuth.nonce + "\", " +
+                "realm=\"" + authServer.info.realm + "\", " +
+                "nonce=\"" + authServer.info.nonce + "\", " +
                 "uri=\"" + uri + "\", " +
-                "algorithm=" + $serverAuth.algorithm + ", " +
+                "algorithm=" + authServer.algorithm + ", " +
                 "response=\"" + generateResponse(username, password, method, uri, nc, cnonce) + "\", " +
-                "opaque=\"" + $serverAuth.opaque + "\", " +
-                "qop=" + $serverAuth.qop + ", " +
+                "opaque=\"" + authServer.info.opaque + "\", " +
+                "qop=" + authServer.info.qop + ", " +
                 "nc=\"" + nc + "\", " +
                 "cnonce=\"" + cnonce + "\"";
         };
@@ -110,23 +123,23 @@ function($rootScope, $serverAuth, md5)
          */
         this.isConfigured = function()
         {
-            return $serverAuth.hasHeader();
+            return authServer.isConfigured();
         };
 
         /**
          * Process a request and add the authorization header
          * if the request need an authentication.
          *
-         * @param username
-         * @param password
-         * @param request
+         * @param {String} username The username.
+         * @param {String} password The password.
+         * @param {Object} request The current request.
          */
         this.processRequest = function(username, password, request)
         {
-            if(request.url.indexOf($serverAuth.domain) >= 0)
+            if(request.url.indexOf(authServer.info.domain) >= 0)
                 request.headers['Authorization'] = generateHeader(username, password, request.method, request.url);
         };
     }
 
-    return new ClientAuth();
+    return new AuthClient();
 }]);

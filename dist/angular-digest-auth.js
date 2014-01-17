@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.1.2 - 2014-01-15
+ * @version v0.1.2 - 2014-01-16
  * @link https://github.com/mgonto/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -37,7 +37,7 @@ dgAuth.config(['$httpProvider', function($httpProvider)
                 {
                     $rootScope.$broadcast($authConfig.getEvent('process.response'), rejection);
 
-                    if(rejection.login)
+                    if(rejection.mustTerminate)
                         return $q.reject(rejection);
 
                     
@@ -76,67 +76,29 @@ dgAuth.run([
     '$rootScope',
     '$authConfig',
     '$authService',
+    '$clientAuth',
     '$serverAuth',
-    '$http',
-function($rootScope, $authConfig, $authService, $serverAuth, $http)
+function($rootScope, $authConfig, $authService, $clientAuth, $serverAuth)
 {
-    $rootScope.requests401 = [];
-
-    var resendRequests = function()
-    {
-        
-
-        for(var i=0; i<$rootScope.requests401.length; i++)
-        {
-            var request = $rootScope.requests401[i];
-
-            $http(request.config).then(function(response)
-            {
-                request.deferred.resolve(response);
-            },
-            function(response)
-            {
-                request.deferred.reject(response);
-            });
-        }
-
-        $rootScope.requests401 = [];
-    };
-
     $rootScope.$on($authConfig.getEvent('process.request'), function(event, request)
     {
-        $authService.processRequest(request);
+        if($clientAuth.isConfigured())
+        {
+            var login = $authService.getCredentials();
+
+            $clientAuth.processRequest(login.username, login.password, request);
+        }
     });
 
     $rootScope.$on($authConfig.getEvent('process.response'), function(event, response)
     {
-        if($authService.isRequested())
-            response.login = true;
+        $authService.mustTerminate(response);
     });
 
     $rootScope.$on($authConfig.getEvent('authentication.header'), function(event, header, request)
     {
-        $rootScope.requests401.push(request);
+        $authService.setHttpRequest(request);
         $serverAuth.parseHeader(header);
-    });
-
-    $rootScope.$on($authConfig.getEvent('signin.required'), function(event)
-    {
-        if($authService.restoreCredential())
-        {
-            event.preventDefault();
-            resendRequests();
-        }
-    });
-
-    $rootScope.$on($authConfig.getEvent('credential.submitted'), function(event, credential)
-    {
-        
-
-        if($rootScope.requests401.length == 0)
-            $authService.signin();
-        else
-            resendRequests();
     });
 }]);
 /**
@@ -251,7 +213,7 @@ function($rootScope, $serverAuth, md5)
          */
         this.isConfigured = function()
         {
-            return $serverAuth.hasHeader();
+            return $serverAuth.isConfigured();
         };
 
         /**
@@ -417,9 +379,9 @@ dgAuth.provider('$authConfig', function AuthConfigProvider()
     };
 
     /**
-     * Gets AuthConfig service.
+     * Gets AuthEvents service.
      *
-     * @returns {AuthConfigProvider.AuthConfig}
+     * @returns {AuthConfigProvider.AuthEvents}
      */
     this.$get = function()
     {
@@ -448,7 +410,7 @@ dgAuth.factory('$serverAuth', ['$authStorage', function($authStorage)
         this.algorithm = "";
         this.qop = "";
 
-        this.hasHeader = function()
+        this.isConfigured = function()
         {
             return $header;
         };
@@ -502,15 +464,7 @@ dgAuth.factory('$serverAuth', ['$authStorage', function($authStorage)
 /**
  * Used to manage the authentication.
  */
-dgAuth.factory('$authService', [
-    '$authConfig',
-    '$authStorage',
-    '$clientAuth',
-    '$rootScope',
-    '$http',
-    '$cookies',
-    'md5',
-function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md5)
+dgAuth.provider('$authService', [function AuthServiceProvider()
 {
     /**
      * Creates the authentication service to performs
@@ -519,8 +473,13 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
      *
      * @constructor
      */
-    function AuthService()
+    function AuthService(config, $authConfig, $authStorage, $rootScope, $http, $q, $cookies, md5)
     {
+        var $signin = config.signin;
+        var $signout = config.signout;
+        var $callbacks = config.callbacks;
+        var $automatic = config.automatic;
+
         /**
          * The current identity
          *
@@ -529,14 +488,43 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
         var $identity = null;
 
         /**
-         * The request used to sing in user.
+         * Initializes the login object.
          *
-         * @type {{username: string, password: string, requested: boolean}}
+         * @returns {{username: string, password: string, httpRequest: null, mustTerminate: boolean}}
          */
-        var $request = {
-            username: '',
-            password: '',
-            requested: false
+        var initLogin = function ()
+        {
+            return {
+                username: '',
+                password: '',
+                httpRequest: null,
+                deferred: null,
+                mustTerminate: false
+            };
+        };
+
+        var initLogout = function()
+        {
+            return {
+                deferred: null,
+                mustTerminate: true
+            }
+        };
+
+        /**
+         * The login object.
+         *
+         * @type {{username: string, password: string, httpRequest: null, mustTerminate: boolean}}
+         */
+        var $login = initLogin();
+
+        var $logout = initLogout();
+
+        this.setHttpRequest = function(request)
+        {
+            angular.extend($login, {
+                httpRequest: request
+            });
         };
 
         /**
@@ -565,76 +553,89 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          * @param {String} username
          * @param {String} password
          */
-        this.setRequest = function(username, password)
+        this.setCredentials = function(username, password)
         {
-          $request = {
+            angular.extend($login, {
                 username: username,
                 password: password,
-                requested: true
-            };
+                mustTerminate: true
+            });
 
             $rootScope.$broadcast($authConfig.getEvent('credential.submitted'), {
-                username: $request.username,
-                password: $request.password,
-                requested: $request.requested
+                username: $login.username,
+                password: $login.password
             });
         };
 
         /**
-         * Gets the request for the sign in.
+         * Gets the login.
          *
-         * @returns {{username: string, password: string, requested: boolean}}
+         * @returns {{username: string, password: string}}
          */
-        this.getRequest = function()
+        this.getCredentials = function()
         {
-            return $request;
+            return {
+                username: $login.username,
+                password: $login.password
+            };
         };
 
-        /**
-         * Checks if the request is set properly.
-         *
-         * @returns {boolean}
-         */
-        this.isRequested = function()
+        this.mustTerminate = function(response)
         {
-            return $request.requested;
+            if(response.config.url == $signin.url)
+            {
+                response.mustTerminate = $login.mustTerminate;
+                return;
+            }
+
+            if(response.config.url == $signout.url)
+                response.mustTerminate = $logout.mustTerminate;
         };
 
-        /**
-         * Checks the authentication.
-         *
-         * @returns {boolean}
-         */
-        this.isAuthenticated = function()
+        var performSignin = function()
         {
-            return ($cookies['_auth'] == md5.createHash('true') && null !== $identity);
-        };
+            
 
-        /**
-         * Gets the credential stored in the auth storage.
-         *
-         * @returns {boolean}
-         */
-        this.restoreCredential = function()
-        {
-            if(!$authStorage.hasCredential() || !$clientAuth.isConfigured())
-                return false;
+            var deferred = $q.defer();
 
-            $request.username = $authStorage.getUsername();
-            $request.password = $authStorage.getPassword();
+            $http($signin)
+                .success(function(data)
+                {
+                    
 
-            return true;
-        };
+                    $identity = angular.extend({
+                        username: $login.username
+                    }, data);
 
-        /**
-         * Processes the request to the server.
-         *
-         * @param {Object} request
-         */
-        this.processRequest = function(request)
-        {
-            if($clientAuth.isConfigured())
-                $clientAuth.processRequest($request.username, $request.password, request);
+                    $cookies['_auth'] = md5.createHash('true');
+
+                    $authStorage.setCredentials($login.username, $login.password);
+
+                    $rootScope.$broadcast($authConfig.getEvent('credential.stored'), {
+                        username: $login.username,
+                        password: $login.password
+                    });
+
+                    $rootScope.$broadcast($authConfig.getEvent('signin.successful'), data);
+
+                    angular.extend($login, {
+                        mustTerminate: false
+                    });
+
+                    deferred.resolve(data);
+                })
+                .error(function(data, status)
+                {
+                    
+
+                    $rootScope.$broadcast($authConfig.getEvent('signin.error'), data, status);
+
+                    $login = initLogin();
+
+                    deferred.reject(data);
+                });
+
+            return deferred;
         };
 
         /**
@@ -642,39 +643,76 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          */
         this.signin = function()
         {
+            if($cookies['_auth'] == md5.createHash('true') || $automatic)
+            {
+                if($authStorage.hasCredential())
+                {
+                    angular.extend($login, {
+                        username: $authStorage.getUsername(),
+                        password: $authStorage.getPassword(),
+                        mustTerminate: true
+                    });
+                }
+            }
+
+            if(!$login.httpRequest)
+            {
+                if(!$login.deferred)
+                {
+                    $login.deferred = performSignin();
+                    $login.deferred.promise.then($callbacks.login.successful, $callbacks.login.error);
+                }
+            }
+            else
+            {
+                var promise = $http($login.httpRequest.config).then(function(response)
+                {
+                    $login.httpRequest.deferred.resolve(response);
+                },
+                function(response)
+                {
+                    $login.httpRequest.deferred.reject(response);
+                });
+
+                promise['finally'](function()
+                {
+                    $login.httpRequest = null;
+                });
+            }
+
+            return $login.deferred.promise;
+        };
+
+        var performSignout = function()
+        {
             
 
-            $http.post($authConfig.getSign().signin, $authConfig.getSign().config)
+            var deferred = $q.defer();
+
+            $http($signout)
                 .success(function(data)
                 {
                     
 
-                    $identity = angular.extend({
-                        username: $request.username
-                    }, data);
+                    $cookies['_auth'] = md5.createHash('false');
 
-                    $cookies['_auth'] = md5.createHash('true');
+                    $identity = null;
+                    $login = initLogin();
 
-                    if($request.requested)
-                    {
-                        $authStorage.setCredential($request.username, $request.password);
-                        $rootScope.$broadcast($authConfig.getEvent('credential.stored'), {
-                            username: $request.username,
-                            password: $request.password
-                        });
+                    $rootScope.$broadcast($authConfig.getEvent('signout.successful'), data);
 
-                        $request.requested = false;
-                    }
-
-                    $rootScope.$broadcast($authConfig.getEvent('signin.successful'), data);
+                    deferred.resolve(data);
                 })
                 .error(function(data, status)
                 {
                     
 
-                    $request = null;
-                    $rootScope.$broadcast($authConfig.getEvent('signin.error'), data, status);
+                    $rootScope.$broadcast($authConfig.getEvent('signout.error'), data, status);
+
+                    deferred.reject(data);
                 });
+
+            return deferred;
         };
 
         /**
@@ -682,27 +720,131 @@ function($authConfig, $authStorage, $clientAuth, $rootScope, $http, $cookies, md
          */
         this.signout = function()
         {
-            
+            if(!$logout.deferred)
+            {
+                $logout.deferred = performSignout();
+                $logout.deferred.promise.then($callbacks.logout.successful, $callbacks.logout.error);
+            }
 
-            $http.post($authConfig.getSign().signout, $authConfig.getSign().config)
-                .success(function(data)
-                {
-                    
+            return $logout.deferred.promise;
+        };
 
-                    $cookies['_auth'] = md5.createHash('false');
-                    $identity = null;
-                    $rootScope.$broadcast($authConfig.getEvent('signout.successful'), data);
-                })
-                .error(function(data, status)
-                {
-                    
+        /**
+         * Checks the authentication.
+         *
+         * @returns {promise|*}
+         */
+        this.isAuthenticated = function()
+        {
+            var deferred = $q.defer();
 
-                    $rootScope.$broadcast($authConfig.getEvent('signout.error'), data, status);
-                });
+            if($logout.deferred)
+            {
+                $logout.deferred.promise.then(function()
+                    {
+                        deferred.reject(null);
+                    },
+                    function()
+                    {
+                        deferred.resolve(($cookies['_auth'] == md5.createHash('true') && null !== $identity))
+                    });
+            }
+            else if($login.deferred)
+            {
+                $login.deferred.promise.then(function()
+                    {
+                        deferred.resolve(($cookies['_auth'] == md5.createHash('true') && null !== $identity));
+                    },
+                    function(reason)
+                    {
+                        deferred.reject(reason);
+                    });
+            }
+
+            return deferred.promise;
         };
     }
 
-    return new AuthService();
+    var $automatic = true;
+
+    this.setAutomatic = function(automatic)
+    {
+        $automatic = automatic;
+    };
+
+    this.getAutomatic = function()
+    {
+        return $automatic;
+    };
+
+    var $signin = {
+        method: 'POST',
+        url: '/signin'
+    };
+
+    this.setSignin = function(signin)
+    {
+        angular.extend($signin, signin);
+    };
+
+    this.getSignin = function()
+    {
+        return $signin;
+    };
+
+    var $signout = {
+        method: 'POST',
+        url: '/signout'
+    };
+
+    this.setSignout = function(signout)
+    {
+       angular.extend($signout, signout);
+    };
+
+    this.getSignout = function()
+    {
+        return $signout;
+    };
+
+    var $callbacks = {
+        login: {
+            successful: function(){},
+            error: function(){}
+        },
+        logout: {
+            successful: function(){},
+            error: function(){}
+        }
+    };
+
+    this.setCallbacks = function(callbacks)
+    {
+        angular.extend($callbacks, callbacks);
+    };
+
+    this.getCallbacks = function()
+    {
+        return $callbacks;
+    };
+
+    this.$get = [
+        '$authConfig',
+        '$authStorage',
+        '$rootScope',
+        '$http',
+        '$q',
+        '$cookies',
+        'md5',
+    function($authConfig, $authStorage, $rootScope, $http, $q, $cookies, md5)
+    {
+        return new AuthService({
+            signin: $signin,
+            signout: $signout,
+            callbacks: $callbacks,
+            automatic: $automatic
+        }, $authConfig, $authStorage, $rootScope, $http, $q, $cookies, md5);
+    }];
 
 }]);
 /**
@@ -733,7 +875,7 @@ dgAuth.provider('$authStorage', function AuthStorageProvider()
             return ((null !== username && null !== password));
         };
 
-        this.setCredential = function(username, password)
+        this.setCredentials = function(username, password)
         {
             $storage.setItem('username', username);
             $storage.setItem('password', password);

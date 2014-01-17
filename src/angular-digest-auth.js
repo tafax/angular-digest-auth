@@ -49,8 +49,9 @@ dgAuth.config(['$httpProvider', function($httpProvider)
                     };
 
                     console.debug('Parse header for authentication.');
-                    $rootScope.$broadcast(authEvents.getEvent('authentication.header'), request);
-                    $rootScope.$broadcast(authEvents.getEvent('signin.required'));
+                    $rootScope.$broadcast(authEvents.getEvent('authentication.header'));
+                    $rootScope.$broadcast(authEvents.getEvent('authentication.request'), request);
+                    $rootScope.$broadcast(authEvents.getEvent('login.required'));
 
                     return deferred.promise;
                 }
@@ -85,7 +86,7 @@ function($rootScope, authEvents, authService, authClient)
         authService.mustTerminate(response);
     });
 
-    $rootScope.$on(authEvents.getEvent('authentication.header'), function(event, request)
+    $rootScope.$on(authEvents.getEvent('authentication.request'), function(event, request)
     {
         authService.setHttpRequest(request);
     });

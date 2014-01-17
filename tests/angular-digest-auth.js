@@ -160,8 +160,9 @@ describe('angular-digest-auth', function()
 
             expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('process.request'), jasmine.any(Object));
             expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('process.response'), jasmine.any(Object));
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('authentication.header'), jasmine.any(Object));
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.required'));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('authentication.header'));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('authentication.request'), jasmine.any(Object));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('login.required'));
 
             var login = {
                 username: 'fake',
@@ -180,7 +181,7 @@ describe('angular-digest-auth', function()
             _httpBackend.flush();
 
             expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('credential.submitted'), login);
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.error'), _loginError, jasmine.any(Number));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('login.error'), _loginError, jasmine.any(Number));
         });
 
         it('multiple login error', function()
@@ -201,7 +202,7 @@ describe('angular-digest-auth', function()
             _httpBackend.expectPOST(_config.login.url);
             _httpBackend.flush();
 
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.error'), _loginError, jasmine.any(Number));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('login.error'), _loginError, jasmine.any(Number));
 
             _authService.setCredentials('fake', 'fake');
             _authService.signin();
@@ -214,7 +215,7 @@ describe('angular-digest-auth', function()
             _httpBackend.expectPOST(_config.login.url);
             _httpBackend.flush();
 
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.error'), _loginError, jasmine.any(Number));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('login.error'), _loginError, jasmine.any(Number));
 
             _authService.setCredentials('test', 'test');
             _authService.signin();
@@ -232,7 +233,7 @@ describe('angular-digest-auth', function()
                 expect(_authService.hasIdentity()).toEqual(true);
             });
 
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.successful'), _identity);
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('login.successful'), _identity);
         });
 
         it('performs the login - successful', function()
@@ -244,8 +245,9 @@ describe('angular-digest-auth', function()
 
             expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('process.request'), jasmine.any(Object));
             expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('process.response'), jasmine.any(Object));
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('authentication.header'), jasmine.any(Object));
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.required'));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('authentication.header'));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('authentication.request'), jasmine.any(Object));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('login.required'));
 
             var login = {
                 username: 'test',
@@ -268,7 +270,7 @@ describe('angular-digest-auth', function()
                 username: login.username,
                 password: login.password
             });
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signin.successful'), _identity);
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('login.successful'), _identity);
         });
 
         it('performs the logout - error', function()
@@ -305,7 +307,7 @@ describe('angular-digest-auth', function()
             _httpBackend.expectPOST(_config.logout.url);
             _httpBackend.flush();
 
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signout.error'), _logoutError, jasmine.any(Number));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('logout.error'), _logoutError, jasmine.any(Number));
         });
 
         it('performs the logout - successful', function()
@@ -336,7 +338,7 @@ describe('angular-digest-auth', function()
             _httpBackend.expectPOST(_config.logout.url);
             _httpBackend.flush();
 
-            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('signout.successful'), jasmine.any(String));
+            expect(_rootScope.$broadcast).toHaveBeenCalledWith(_authEvents.getEvent('logout.successful'), jasmine.any(String));
         });
     });
 });

@@ -3,6 +3,8 @@ It is an AngularJS module to manage HTTP Digest Authentication. It provides basi
 to sign in and sign out. It automatically manages the synchronization between the client and the
 server after the user did the login.
 
+**NB:** *the module is under development and so some features or APIs can change.*
+
 #Installation
 You can download this by:
 * Using bower and running `bower install angular-digest-auth --save` (recommended)
@@ -19,60 +21,129 @@ This module depends on [angular](https://github.com/angular/angular.js), [angula
 and [angular-md5](https://github.com/gdi2290/angular-md5).
 
 #Configuration
+You have to provide a few configurations in order to work.
+
+###Login and logout
 How to configure the urls to sing in and sign out.
 ````javascript
-app.config(['$authConfigProvider', function($authConfigProvider)
+app.config(['authServiceProvider', function(authServiceProvider)
 {
-    $authConfigProvider.setSign({
-        signin: '/path/to/signin',
-        signin: '/path/to/signout'
+    authServiceProvider.setConfig({
+        login: {
+            method: 'POST',
+            url: '/signin'
+            ...
+            //Other HTTP configurations.
+        },
+        logout: {
+            method: 'POST',
+            url: '/signout'
+            ...
+            //Other HTTP configurations.
+        }
     });
 }]);
 ````
+
+###Header
 How to configure the header to search server information.
 ````javascript
-app.config(['$authConfigProvider', function($authConfigProvider)
+app.config(['authServerProvider', function(authServerProvider)
 {
-    $authConfigProvider.setSign({
-        signin: '/path/to/signin',
-        signin: '/path/to/signout'
-    });
-
-    $authConfigProvider.setHeader('X-Header-For-Authentication');
+    authServerProvider.setHeader('Your-Header-For-Authentication');
 }]);
 ````
 
-By default, after the user has made the login, the credentials are stored in **sessionStorage** and the module
-processes all further requests with this credentials. If you want the user is reconnected when he returns in your
-app, you can specify the **localStorage** as default storage.
+###Calbacks
+How to configure what happens at the user login and/or logout.
 ````javascript
-app.config(['$authStorageProvider', function($authStorageProvider)
+app.config(['authServiceProvider', function(authServiceProvider)
 {
-    $authStorageProvider.setStorage(localStorage);
+    /**
+     * You can add the callbacks to manage what happens after
+     * successful of the login. You can specify both two functions
+     * or just one.
+     */
+    authServiceProvider.callbacks.login.push(['serviceInject', function(serviceInject)
+    {
+        return {
+            successful: function(data)
+            {
+                //Your code to manage the login successful.
+            },
+            error: function(error)
+            {
+                //Your code to manage the login error.
+            }
+        };
+    }]);
+
+    //This is the same for the logout.
+
+    /**
+     * You can add the callbacks to manage what happens after
+     * successful of the logout. You can specify both two functions
+     * or just one.
+     */
+    authServiceProvider.callbacks.login.push(['serviceInject', function(serviceInject)
+    {
+        return {
+            successful: function(data)
+            {
+                //Your code to manage the logout successful.
+            },
+            error: function(error)
+            {
+                //Your code to manage the logout error.
+            }
+        };
+    }]);
+}]);
+````
+
+###Storage
+By default, after the user has made the login, the credentials are stored in **sessionStorage** and the module
+processes all further requests with this credentials. If you want the user is automatically reconnected when
+he returns in your app, you can specify the **localStorage** as default storage.
+````javascript
+app.config(['authStorageProvider', 'authServiceProvider', function(authStorageProvider, authServiceProvider)
+{
+    /**
+     * Tells to service that it can be reconnect the user
+     * even if he has signed out or he has closed the browser.
+     */
+    authServiceProvider.setAutomatic(true);
+
+    /**
+     * Uses localStorage instead the sessionStorage.
+     * The service can automatically reconnect the user
+     * only with localStorage.
+     */
+    authStorageProvider.setStorage(localStorage);
 }]);
 ````
 
 Obviously, if you want to specify your own storage object, you can :).
 
 #Usage
-For basic usage, you can launch the `signin()` when your app goes run. Then, you can handle two events: `signin.required`
-and `signin.successful`.
+For basic usage, you can launch the `signin()` when your app goes run.
+Then, you can handle one base event: `signin.required`.
 ````javascript
-app.run(['$authConfig', '$authService', function($authConfig, $authService)
+app.run(['authService', 'authEvents', '$rootScope', function(authService, authEvents, $rootScope)
 {
-    $authService.signin();
+    /**
+     * It tries to sign in. If the service doesn't find
+     * the credentials stored or the user is not signed in yet,
+     * the service launch a signin.required event.
+     */
+    authService.signin();
 
-    $authService.$on($authConfig.getEvent('signin.required'), function(event)
+    /**
+     * The event is fired when a login is required.
+     */
+    $rootScope.$on(authEvents.getEvent('signin.required'), function(event)
     {
-        if(!event.defaultPrevented)
-        {
-            //Redirect user to your login page. Ex: $location.path('/path/to/login');
-        }
-    });
-
-    $authService.$on($authConfig.getEvent('signin.successful'), function(event, data)
-    {
-        //Redirect user to you home page. Ex: $location.path('/path/to/home');
+        //Redirect user to your login page. Ex: $location.path('/path/to/login');
     });
 }]);
 ````
@@ -81,47 +152,90 @@ In your login controller you should provide the credentials submitted by user.
 ````javascript
 $scope.submit = function(user)
 {
-    $authService.setRequest(user.username, user.password);
+    authService.setCredentials(user.username, user.password);
+    authService.signin();
 };
 ````
 
 After this, the service performs a login again without doing any more.
+
+#Authorization
+You can use a functionality of authService to authorize the user to navigate in your app.
+````javascript
+app.config(['$routeProvider', function($routeProvider)
+{
+    /**
+     * Define the routing to the login.
+     */
+    $routeProvider.when('path/to/login', {...});
+
+    /**
+     * Use a variable in resolve to authorize the users.
+     * The method 'isAuthenticated()' returns a promise
+     * which you can use to validate the requests.
+     * The promise is resolved after user login or logout.
+     */
+    $routeProvider.when('some/path', {
+        ...
+        resolve: {
+            auth: ['authService', '$q', '$location', function(authService, $q, $location)
+            {
+                var deferred = $q.defer();
+
+                authService.isAuthenticated().then(function()
+                {
+                    deferred.resolve();
+                },
+                function()
+                {
+                    deferred.reject();
+                    $location.path('path/to/login');
+                });
+
+                return deferred.promise;
+            }]
+        }
+    });
+}]);
+````
 
 #Events
 The module uses several events to provide its functionality. You can use the list of all events to handle
 the module environment.
 ````javascript
 authentication: {
-    header: //A valid header is found in server response
+    headerNotFound: //After a login request no header has been found.
+    header: //A valid header is found in server response.
+    request: //After a login request a valid authentication request is found in the server response.
 },
 process: {
-    request: //A request is processed by the module
-    response: //A response with status 401 is processed by the module
+    request: //A request is processed by the module.
+    response: //A response with status 401 is processed by the module.
 },
 signin: {
-    successful: //The login is successful
-    error: //The login is incorrect
-    required: //The login is required to access a functionality
+    successful: //The login is successful.
+    error: //The login responds with an error.
+    required: //The login is required to access a functionality.
 },
 signout: {
     successful: //The logout is successful
-    error: //The logout is in error
+    error: //The logout responds with an error.
 },
 credential: {
-    submitted: //The new credentials are submitted
-    stored: //The credentials are stored in the auth storage
-    restored: //The credentials in the storage are restore
+    submitted: //The new credentials are submitted.
+    stored: //The credentials are stored in the auth storage.
+    restored: //The credentials in the storage are restored.
 }
 ````
 
-You can use the `$authConfig` service to handle the events and do your own tasks. For example, with
-`$authConfig.getEvent('signin.error')` you can handle if an error appears in the login procedure and
+You can use the `authEvents` service to handle the events and do your own tasks. For example, with
+`authEvents.getEvent('signin.error')` you can handle if an error appears in the login procedure and
 afterwards you can notify this error in your view to the user.
 Also you can specify your events.
 ````javascript
-app.config(['$authConfigProvider', function($authConfigProvider)
+app.config(['authEventsProvider', function(authEventsProvider)
 {
-    $authConfigProvider.setEvents({
+    authEventsProvider.setEvents({
         authentication: {
             header: 'my_header_event'
         },

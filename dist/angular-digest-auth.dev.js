@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.1.2 - 2014-01-16
+ * @version v0.2.0 - 2014-01-18
  * @link https://github.com/mgonto/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -21,13 +21,14 @@ dgAuth.config(['$httpProvider', function($httpProvider)
     $httpProvider.interceptors.push([
         '$rootScope',
         '$q',
-        '$authConfig',
-    function($rootScope, $q, $authConfig)
+        'authServer',
+        'authEvents',
+    function($rootScope, $q, authServer, authEvents)
     {
         return {
             'request': function(request)
             {
-                $rootScope.$broadcast($authConfig.getEvent('process.request'), request);
+                $rootScope.$broadcast(authEvents.getEvent('process.request'), request);
 
                 return (request || $q.when(request));
             },
@@ -35,18 +36,16 @@ dgAuth.config(['$httpProvider', function($httpProvider)
             {
                 if(rejection.status === 401)
                 {
-                    $rootScope.$broadcast($authConfig.getEvent('process.response'), rejection);
+                    $rootScope.$broadcast(authEvents.getEvent('process.response'), rejection);
 
                     if(rejection.mustTerminate)
                         return $q.reject(rejection);
 
                     console.debug("Server has requested an authentication.");
 
-                    var header = rejection.headers($authConfig.getHeader());
-
-                    if(null == header)
+                    if(!authServer.parseHeader(rejection))
                     {
-                        $rootScope.$broadcast($authConfig.getEvent('authentication.notFound'));
+                        $rootScope.$broadcast(authEvents.getEvent('authentication.notFound'));
                         return $q.reject(rejection);
                     }
 
@@ -56,9 +55,10 @@ dgAuth.config(['$httpProvider', function($httpProvider)
                         deferred: deferred
                     };
 
-                    console.debug('Parse header for authentication: ' + header);
-                    $rootScope.$broadcast($authConfig.getEvent('authentication.header'), header, request);
-                    $rootScope.$broadcast($authConfig.getEvent('signin.required'));
+                    console.debug('Parse header for authentication.');
+                    $rootScope.$broadcast(authEvents.getEvent('authentication.header'));
+                    $rootScope.$broadcast(authEvents.getEvent('authentication.request'), request);
+                    $rootScope.$broadcast(authEvents.getEvent('login.required'));
 
                     return deferred.promise;
                 }
@@ -74,41 +74,38 @@ dgAuth.config(['$httpProvider', function($httpProvider)
  */
 dgAuth.run([
     '$rootScope',
-    '$authConfig',
-    '$authService',
-    '$clientAuth',
-    '$serverAuth',
-function($rootScope, $authConfig, $authService, $clientAuth, $serverAuth)
+    'authEvents',
+    'authService',
+    'authClient',
+function($rootScope, authEvents, authService, authClient)
 {
-    $rootScope.$on($authConfig.getEvent('process.request'), function(event, request)
+    $rootScope.$on(authEvents.getEvent('process.request'), function(event, request)
     {
-        if($clientAuth.isConfigured())
+        if(authClient.isConfigured())
         {
-            var login = $authService.getCredentials();
-
-            $clientAuth.processRequest(login.username, login.password, request);
+            var login = authService.getCredentials();
+            authClient.processRequest(login.username, login.password, request);
         }
     });
 
-    $rootScope.$on($authConfig.getEvent('process.response'), function(event, response)
+    $rootScope.$on(authEvents.getEvent('process.response'), function(event, response)
     {
-        $authService.mustTerminate(response);
+        authService.mustTerminate(response);
     });
 
-    $rootScope.$on($authConfig.getEvent('authentication.header'), function(event, header, request)
+    $rootScope.$on(authEvents.getEvent('authentication.request'), function(event, request)
     {
-        $authService.setHttpRequest(request);
-        $serverAuth.parseHeader(header);
+        authService.setHttpRequest(request);
     });
 }]);
 /**
  * Manages authentication info in the client scope.
  */
-dgAuth.factory('$clientAuth', [
+dgAuth.factory('authClient', [
     '$rootScope',
-    '$serverAuth',
+    'authServer',
     'md5',
-function($rootScope, $serverAuth, md5)
+function($rootScope, authServer, md5)
 {
     /**
      * Creates the service to use information generating
@@ -116,10 +113,23 @@ function($rootScope, $serverAuth, md5)
      *
      * @constructor
      */
-    function ClientAuth()
+    function AuthClient()
     {
-        var $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        var $nc = 0;
+        /**
+         * Chars to select when creating nonce.
+         *
+         * @type {string}
+         * @private
+         */
+        var _chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+        /**
+         * Current counter.
+         *
+         * @type {number}
+         * @private
+         */
+        var _nc = 0;
 
         /**
          * Generates the cnonce with the given length.
@@ -130,11 +140,11 @@ function($rootScope, $serverAuth, md5)
         var generateNonce = function(length)
         {
             var nonce = [];
-            var charsLength = $chars.length;
+            var charsLength = _chars.length;
 
             for (var i = 0; i < length; ++i)
             {
-                nonce.push($chars[Math.random() * charsLength | 0]);
+                nonce.push(_chars[Math.random() * charsLength | 0]);
             }
 
             return nonce.join('');
@@ -147,9 +157,9 @@ function($rootScope, $serverAuth, md5)
          */
         var getNc = function()
         {
-            $nc++;
+            _nc++;
 
-            var zeros = 8 - $nc.toString().length;
+            var zeros = 8 - _nc.toString().length;
 
             var nc = "";
             for(var i=0; i<zeros; i++)
@@ -157,34 +167,34 @@ function($rootScope, $serverAuth, md5)
                 nc += "0";
             }
 
-            return (nc + $nc);
+            return (nc + _nc);
         };
 
         /**
          * Generate the response.
          *
-         * @param username
-         * @param password
-         * @param method Method used for the request.
-         * @param uri Uri of the resource requested.
-         * @param nc The progressive nc.
-         * @param cnonce The cnonce.
+         * @param {String} username The username.
+         * @param {String} password The password.
+         * @param {String} method Method used for the request.
+         * @param {String} uri Uri of the resource requested.
+         * @param {String} nc The progressive nc.
+         * @param {String} cnonce The cnonce.
          * @returns {string}
          */
         var generateResponse = function(username, password, method, uri, nc, cnonce)
         {
-            var ha1 = md5.createHash(username + ":" + $serverAuth.realm + ":" + password);
+            var ha1 = md5.createHash(username + ":" + authServer.info.realm + ":" + password);
             var ha2 = md5.createHash(method + ":" + uri);
-            return md5.createHash(ha1 + ":" + $serverAuth.nonce + ":" + nc + ":" + cnonce + ":" + $serverAuth.qop + ":" + ha2);
+            return md5.createHash(ha1 + ":" + authServer.info.nonce + ":" + nc + ":" + cnonce + ":" + authServer.info.qop + ":" + ha2);
         };
 
         /**
          * Aggregates all information to generate header.
          *
-         * @param username
-         * @param password
-         * @param method Method used for the request.
-         * @param uri Uri of the resource requested.
+         * @param {String} username The username.
+         * @param {String} password The password.
+         * @param {String} method Method used for the request.
+         * @param {String} uri Uri of the resource requested.
          * @returns {string}
          */
         var generateHeader = function(username, password, method, uri)
@@ -194,13 +204,13 @@ function($rootScope, $serverAuth, md5)
 
             return "Digest " +
                 "username=\"" + username + "\", " +
-                "realm=\"" + $serverAuth.realm + "\", " +
-                "nonce=\"" + $serverAuth.nonce + "\", " +
+                "realm=\"" + authServer.info.realm + "\", " +
+                "nonce=\"" + authServer.info.nonce + "\", " +
                 "uri=\"" + uri + "\", " +
-                "algorithm=" + $serverAuth.algorithm + ", " +
+                "algorithm=" + authServer.algorithm + ", " +
                 "response=\"" + generateResponse(username, password, method, uri, nc, cnonce) + "\", " +
-                "opaque=\"" + $serverAuth.opaque + "\", " +
-                "qop=" + $serverAuth.qop + ", " +
+                "opaque=\"" + authServer.info.opaque + "\", " +
+                "qop=" + authServer.info.qop + ", " +
                 "nc=\"" + nc + "\", " +
                 "cnonce=\"" + cnonce + "\"";
         };
@@ -213,58 +223,50 @@ function($rootScope, $serverAuth, md5)
          */
         this.isConfigured = function()
         {
-            return $serverAuth.isConfigured();
+            return authServer.isConfigured();
         };
 
         /**
          * Process a request and add the authorization header
          * if the request need an authentication.
          *
-         * @param username
-         * @param password
-         * @param request
+         * @param {String} username The username.
+         * @param {String} password The password.
+         * @param {Object} request The current request.
          */
         this.processRequest = function(username, password, request)
         {
-            if(request.url.indexOf($serverAuth.domain) >= 0)
+            if(request.url.indexOf(authServer.info.domain) >= 0)
                 request.headers['Authorization'] = generateHeader(username, password, request.method, request.url);
         };
     }
 
-    return new ClientAuth();
+    return new AuthClient();
 }]);
 
 'use strict';
 
 /**
- * Manages the configuration for the auth module.
+ * Manages the events for the auth module.
  */
-dgAuth.provider('$authConfig', function AuthConfigProvider()
+dgAuth.provider('authEvents', function AuthEventsProvider()
 {
     /**
-     * AuthConfig provides a service to get
+     * AuthEvents provides a service to get
      * basic configuration
      *
-     * @param {Object} sign Object to represent sign in, sign out urls and configuration.
      * @param {Object} events Object to represent all events.
-     * @param {String} header Specifies header to get authentication string from the server response.
      * @constructor
      */
-    function AuthConfig(sign, events, header)
+    function AuthEvents(events)
     {
-        var $sign = sign;
-        var $events = events;
-        var $header = header;
-
         /**
-         * Gets the sign object.
+         * The events of module.
          *
-         * @returns {Object}
+         * @type {Object}
+         * @private
          */
-        this.getSign = function()
-        {
-            return $sign;
-        };
+        var _events = events;
 
         /**
          * Gets all events.
@@ -273,7 +275,7 @@ dgAuth.provider('$authConfig', function AuthConfigProvider()
          */
         this.getEvents = function()
         {
-            return $events;
+            return _events;
         };
 
         /**
@@ -287,50 +289,31 @@ dgAuth.provider('$authConfig', function AuthConfigProvider()
         {
             var split = event.split('.');
 
-            return $events[split[0]][split[1]];
-        };
-
-        /**
-         * Gets the header.
-         *
-         * @returns {String}
-         */
-        this.getHeader = function()
-        {
-            return $header;
+            return _events[split[0]][split[1]];
         };
     }
 
     /**
-     * The sign object.
-     *
-     * @type {{signin: string, signout: string, config: {}}}
-     */
-    var $sign = {
-        signin: '',
-        signout: '',
-        config: {}
-    };
-
-    /**
      * All events in the module.
      *
-     * @type {{authentication: {header: string}, process: {request: string, response: string}, signin: {successful: string, error: string, required: string}, signout: {successful: string, error: string}, credential: {submitted: string, stored: string, restored: string}}}
+     * @type {{authentication: {header: string}, process: {request: string, response: string}, login: {successful: string, error: string, required: string}, logout: {successful: string, error: string}, credential: {submitted: string, stored: string, restored: string}}}
      */
-    var $events = {
+    var _events = {
         authentication: {
-            header: '$authAuthenticationHeader'
+            headerNotFound: '$authAuthenticationHeaderNotFound',
+            header: '$authAuthenticationHeader',
+            request: '$authAuthenticationRequest'
         },
         process: {
             request: '$authProcessRequest',
             response: '$authProcessResponse'
         },
-        signin: {
+        login: {
             successful: '$authSigninSuccessful',
             error: '$authSigninError',
             required: '$authSigninRequired'
         },
-        signout: {
+        logout: {
             successful: '$authSignoutSuccessful',
             error: '$authSignoutError'
         },
@@ -342,31 +325,129 @@ dgAuth.provider('$authConfig', function AuthConfigProvider()
     };
 
     /**
-     * The header string.
-     *
-     * @type {string}
-     */
-    var $header = '';
-
-    /**
-     * Sets the sign object by extending basic configuration.
-     *
-     * @param {Object} sign
-     */
-    this.setSign = function(sign)
-    {
-        angular.extend($sign, sign);
-    };
-
-    /**
      * Sets events by extending basic configuration.
      *
      * @param {Object} events
      */
     this.setEvents = function(events)
     {
-        angular.extend($events, events);
+        angular.extend(_events, events);
     };
+
+    /**
+     * Gets AuthEvents service.
+     *
+     * @returns {AuthEventsProvider.AuthEvents}
+     */
+    this.$get = function()
+    {
+        return new AuthEvents(_events);
+    };
+});
+/**
+ * Parses and provides server information for the authentication.
+ */
+dgAuth.provider('authServer', function AuthServerProvider()
+{
+    /**
+     * Creates the service for the server info.
+     *
+     * @constructor
+     */
+    function AuthServer(header, authStorage)
+    {
+        /**
+         * The header string.
+         *
+         * @type {string}
+         */
+        var _header = header;
+
+        /**
+         * The regular expression to evaluate server information.
+         *
+         * @type {RegExp}
+         * @private
+         */
+        var _valuePattern = /([a-zA-Z]+)=\"?([a-zA-Z0-9\/\s]+)\"?/;
+
+        /**
+         * True if the header was correctly parsed.
+         *
+         * @type {boolean}
+         * @private
+         */
+        var _configured = false;
+
+        /**
+         * The configuration of server information.
+         *
+         * @type {{realm: string, domain: string, nonce: string, opaque: string, algorithm: string, qop: string}}
+         */
+        this.info = {
+            realm: '',
+            domain: '',
+            nonce: '',
+            opaque: '',
+            algorithm: '',
+            qop: ''
+        };
+
+        /**
+         * Checks if the header was correctly parsed.
+         *
+         * @returns {boolean}
+         */
+        this.isConfigured = function()
+        {
+            return _configured;
+        };
+
+        /**
+         * Sets the configuration manually.
+         *
+         * @param {Object} server The server information.
+         */
+        this.setConfig = function(server)
+        {
+            angular.extend(this.info, server);
+
+            _configured = true;
+        };
+
+        /**
+         * Parses header to set the information.
+         *
+         * @param {Object} response The response to login request.
+         */
+        this.parseHeader = function(response)
+        {
+            var header = response.headers(_header);
+
+            if(null !== header)
+            {
+                var splitting = header.split(', ');
+
+                for(var i=0; i<splitting.length; i++)
+                {
+                    var values = _valuePattern.exec(splitting[i]);
+                    this.info[values[1]] = values[2];
+                }
+
+                authStorage.setServerAuth(this.info);
+                _configured = true;
+            }
+
+            return _configured;
+        };
+    }
+
+    /**
+     * The header string.
+     *
+     * @type {string}
+     */
+    var _header = '';
 
     /**
      * Sets the header.
@@ -375,96 +456,24 @@ dgAuth.provider('$authConfig', function AuthConfigProvider()
      */
     this.setHeader = function(header)
     {
-        $header = header;
+        _header = header;
     };
 
-    /**
-     * Gets AuthEvents service.
-     *
-     * @returns {AuthConfigProvider.AuthEvents}
-     */
-    this.$get = function()
+    this.$get = ['authStorage', function(authStorage)
     {
-        return new AuthConfig($sign, $events, $header);
-    };
-});
-/**
- * Parses and provides server information for the authentication.
- */
-dgAuth.factory('$serverAuth', ['$authStorage', function($authStorage)
-{
-    /**
-     * Creates the service for the server info.
-     *
-     * @constructor
-     */
-    function ServerAuth()
-    {
-        var $valuePattern = /([a-zA-Z]+)=\"?([a-zA-Z0-9\/\s]+)\"?/;
-        var $header = false;
+        var auth = new AuthServer(_header, authStorage);
 
-        this.realm = "";
-        this.domain = "";
-        this.nonce = "";
-        this.opaque = "";
-        this.algorithm = "";
-        this.qop = "";
-
-        this.isConfigured = function()
-        {
-            return $header;
-        };
-
-        this.config = function(server)
-        {
-            this.realm = server.realm;
-            this.domain = server.domain;
-            this.nonce = server.nonce;
-            this.opaque = server.opaque;
-            this.algorithm = server.algorithm;
-            this.qop = server.qop;
-            $header = true;
-        };
-
-        this.parseHeader = function(headerLine)
-        {
-            var splitting = headerLine.split(', ');
-
-            for(var i=0; i<splitting.length; i++)
-            {
-                var values = $valuePattern.exec(splitting[i]);
-                this[values[1]] = values[2];
-            }
-
-            $header = true;
-            $authStorage.setServerAuth(this);
-        };
-    }
-
-    /**
-     * Creates server info taking
-     * the information from storage
-     * if they are previously saved.
-     *
-     * @returns {ServerAuth}
-     */
-    var getServerAuth = function()
-    {
-        var auth = new ServerAuth();
-
-        if($authStorage.hasServerAuth())
-            auth.config($authStorage.getServerAuth());
+        if(authStorage.hasServerAuth())
+            auth.setConfig(authStorage.getServerAuth());
 
         return auth;
-    };
-
-    return getServerAuth();
-}]);
+    }];
+});
 
 /**
  * Used to manage the authentication.
  */
-dgAuth.provider('$authService', [function AuthServiceProvider()
+dgAuth.provider('authService', [function AuthServiceProvider()
 {
     /**
      * Creates the authentication service to performs
@@ -473,24 +482,69 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
      *
      * @constructor
      */
-    function AuthService(config, $authConfig, $authStorage, $rootScope, $http, $q, $cookies, md5)
+    function AuthService(config, $injector, authEvents, authStorage, $rootScope, $http, $q, $cookies, md5)
     {
-        var $signin = config.signin;
-        var $signout = config.signout;
-        var $callbacks = config.callbacks;
-        var $automatic = config.automatic;
+        /**
+         * The configuration of service.
+         *
+         * @type {{login: Object, logout: Object, callbacks: Object, automatic: boolean}}
+         * @private
+         */
+        var _config = config;
+
+        /**
+         * The configuration for the login.
+         *
+         * @type {Object}
+         * @private
+         */
+        var _login = config.login;
+
+        /**
+         * The configuration for the logout.
+         *
+         * @type {Object}
+         * @private
+         */
+        var _logout = config.logout;
+
+        /**
+         * The configuration of callbacks
+         *
+         * @type {Object}
+         * @private
+         */
+        var _callbacks = config.callbacks;
+
+        /**
+         * The configuration for automatic reconnection.
+         *
+         * @type {boolean}
+         * @private
+         */
+        var _automatic = config.automatic;
+
+        /**
+         * Gets all configurations.
+         *
+         * @returns {{login: Object, logout: Object, callbacks: Object, automatic: boolean}}
+         */
+        this.getConfig = function()
+        {
+            return _config;
+        };
 
         /**
          * The current identity
          *
          * @type {Object}
          */
-        var $identity = null;
+        var _identity = null;
 
         /**
          * Initializes the login object.
          *
-         * @returns {{username: string, password: string, httpRequest: null, mustTerminate: boolean}}
+         * @returns {{username: string, password: string, httpRequest: null, deferred: null, mustTerminate: boolean}}
          */
         var initLogin = function ()
         {
@@ -503,6 +557,11 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
             };
         };
 
+        /**
+         * Initializes the logout object.
+         *
+         * @returns {{deferred: null, mustTerminate: boolean}}
+         */
         var initLogout = function()
         {
             return {
@@ -516,13 +575,23 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
          *
          * @type {{username: string, password: string, httpRequest: null, mustTerminate: boolean}}
          */
-        var $login = initLogin();
+        var _loginRequest = initLogin();
 
-        var $logout = initLogout();
+        /**
+         * The logout object.
+         *
+         * @type {{deferred: null, mustTerminate: boolean}}
+         */
+        var _logoutRequest = initLogout();
 
+        /**
+         * Sets the http request for login.
+         *
+         * @param {Object} request
+         */
         this.setHttpRequest = function(request)
         {
-            angular.extend($login, {
+            angular.extend(_loginRequest, {
                 httpRequest: request
             });
         };
@@ -534,7 +603,7 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
          */
         this.hasIdentity = function()
         {
-            return (null !== $identity);
+            return (null !== _identity);
         };
 
         /**
@@ -544,7 +613,7 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
          */
         this.getIdentity = function()
         {
-            return $identity;
+            return _identity;
         };
 
         /**
@@ -555,15 +624,15 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
          */
         this.setCredentials = function(username, password)
         {
-            angular.extend($login, {
+            angular.extend(_loginRequest, {
                 username: username,
                 password: password,
                 mustTerminate: true
             });
 
-            $rootScope.$broadcast($authConfig.getEvent('credential.submitted'), {
-                username: $login.username,
-                password: $login.password
+            $rootScope.$broadcast(authEvents.getEvent('credential.submitted'), {
+                username: _loginRequest.username,
+                password: _loginRequest.password
             });
         };
 
@@ -575,21 +644,21 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
         this.getCredentials = function()
         {
             return {
-                username: $login.username,
-                password: $login.password
+                username: _loginRequest.username,
+                password: _loginRequest.password
             };
         };
 
         this.mustTerminate = function(response)
         {
-            if(response.config.url == $signin.url)
+            if(response.config.url == _login.url)
             {
-                response.mustTerminate = $login.mustTerminate;
+                response.mustTerminate = _loginRequest.mustTerminate;
                 return;
             }
 
-            if(response.config.url == $signout.url)
-                response.mustTerminate = $logout.mustTerminate;
+            if(response.config.url == _logout.url)
+                response.mustTerminate = _logoutRequest.mustTerminate;
         };
 
         var performSignin = function()
@@ -598,27 +667,25 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
 
             var deferred = $q.defer();
 
-            $http($signin)
+            $http(_login)
                 .success(function(data)
                 {
                     console.debug('Login successful.');
 
-                    $identity = angular.extend({
-                        username: $login.username
-                    }, data);
+                    _identity = data;
 
                     $cookies['_auth'] = md5.createHash('true');
 
-                    $authStorage.setCredentials($login.username, $login.password);
+                    authStorage.setCredentials(_loginRequest.username, _loginRequest.password);
 
-                    $rootScope.$broadcast($authConfig.getEvent('credential.stored'), {
-                        username: $login.username,
-                        password: $login.password
+                    $rootScope.$broadcast(authEvents.getEvent('credential.stored'), {
+                        username: _loginRequest.username,
+                        password: _loginRequest.password
                     });
 
-                    $rootScope.$broadcast($authConfig.getEvent('signin.successful'), data);
+                    $rootScope.$broadcast(authEvents.getEvent('login.successful'), data);
 
-                    angular.extend($login, {
+                    angular.extend(_loginRequest, {
                         mustTerminate: false
                     });
 
@@ -628,9 +695,9 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
                 {
                     console.debug('Login error.');
 
-                    $rootScope.$broadcast($authConfig.getEvent('signin.error'), data, status);
+                    $rootScope.$broadcast(authEvents.getEvent('login.error'), data, status);
 
-                    $login = initLogin();
+                    _loginRequest = initLogin();
 
                     deferred.reject(data);
                 });
@@ -643,44 +710,53 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
          */
         this.signin = function()
         {
-            if($cookies['_auth'] == md5.createHash('true') || $automatic)
+            if($cookies['_auth'] == md5.createHash('true') || _automatic)
             {
-                if($authStorage.hasCredential())
+                if(authStorage.hasCredential())
                 {
-                    angular.extend($login, {
-                        username: $authStorage.getUsername(),
-                        password: $authStorage.getPassword(),
+                    angular.extend(_loginRequest, {
+                        username: authStorage.getUsername(),
+                        password: authStorage.getPassword(),
                         mustTerminate: true
+                    });
+
+                    $rootScope.$broadcast(authEvents.getEvent('credential.restored'), {
+                        username: _loginRequest.username,
+                        password: _loginRequest.password
                     });
                 }
             }
 
-            if(!$login.httpRequest)
+            if(!_loginRequest.httpRequest)
             {
-                if(!$login.deferred)
+                if(!_loginRequest.deferred)
                 {
-                    $login.deferred = performSignin();
-                    $login.deferred.promise.then($callbacks.login.successful, $callbacks.login.error);
+                    _loginRequest.deferred = performSignin();
+                    for(var i in _callbacks.login)
+                    {
+                        var callback = $injector.invoke(_callbacks.login[i]);
+                        _loginRequest.deferred.promise.then(callback.successful, callback.error);
+                    }
                 }
             }
             else
             {
-                var promise = $http($login.httpRequest.config).then(function(response)
+                var promise = $http(_loginRequest.httpRequest.config).then(function(response)
                 {
-                    $login.httpRequest.deferred.resolve(response);
+                    _loginRequest.httpRequest.deferred.resolve(response);
                 },
                 function(response)
                 {
-                    $login.httpRequest.deferred.reject(response);
+                    _loginRequest.httpRequest.deferred.reject(response);
                 });
 
                 promise['finally'](function()
                 {
-                    $login.httpRequest = null;
+                    _loginRequest.httpRequest = null;
                 });
             }
 
-            return $login.deferred.promise;
+            return _loginRequest.deferred.promise;
         };
 
         var performSignout = function()
@@ -689,17 +765,17 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
 
             var deferred = $q.defer();
 
-            $http($signout)
+            $http(_logout)
                 .success(function(data)
                 {
                     console.debug('Logout successful.');
 
                     $cookies['_auth'] = md5.createHash('false');
 
-                    $identity = null;
-                    $login = initLogin();
+                    _identity = null;
+                    _loginRequest = initLogin();
 
-                    $rootScope.$broadcast($authConfig.getEvent('signout.successful'), data);
+                    $rootScope.$broadcast(authEvents.getEvent('logout.successful'), data);
 
                     deferred.resolve(data);
                 })
@@ -707,7 +783,7 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
                 {
                     console.debug('Logout error.');
 
-                    $rootScope.$broadcast($authConfig.getEvent('signout.error'), data, status);
+                    $rootScope.$broadcast(authEvents.getEvent('logout.error'), data, status);
 
                     deferred.reject(data);
                 });
@@ -720,13 +796,17 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
          */
         this.signout = function()
         {
-            if(!$logout.deferred)
+            if(!_logoutRequest.deferred)
             {
-                $logout.deferred = performSignout();
-                $logout.deferred.promise.then($callbacks.logout.successful, $callbacks.logout.error);
+                _logoutRequest.deferred = performSignout();
+                for(var i in _callbacks.logout)
+                {
+                    var callbacks = $injector.invoke(_callbacks.logout[i]);
+                    _logoutRequest.deferred.promise.then(callbacks.successful, callbacks.error);
+                }
             }
 
-            return $logout.deferred.promise;
+            return _logoutRequest.deferred.promise;
         };
 
         /**
@@ -738,22 +818,22 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
         {
             var deferred = $q.defer();
 
-            if($logout.deferred)
+            if(_logoutRequest.deferred)
             {
-                $logout.deferred.promise.then(function()
+                _logoutRequest.deferred.promise.then(function()
                     {
                         deferred.reject(null);
                     },
                     function()
                     {
-                        deferred.resolve(($cookies['_auth'] == md5.createHash('true') && null !== $identity))
+                        deferred.resolve(($cookies['_auth'] == md5.createHash('true') && null !== _identity))
                     });
             }
-            else if($login.deferred)
+            else if(_loginRequest.deferred)
             {
-                $login.deferred.promise.then(function()
+                _loginRequest.deferred.promise.then(function()
                     {
-                        deferred.resolve(($cookies['_auth'] == md5.createHash('true') && null !== $identity));
+                        deferred.resolve(($cookies['_auth'] == md5.createHash('true') && null !== _identity));
                     },
                     function(reason)
                     {
@@ -765,93 +845,109 @@ dgAuth.provider('$authService', [function AuthServiceProvider()
         };
     }
 
-    var $automatic = true;
+    /**
+     * Callbacks configuration.
+     *
+     * @type {{login: Array, logout: Array}}
+     */
+    this.callbacks = {
+        login: [],
+        logout: []
+    };
 
+    /**
+     * The configuration for automatic reconnection.
+     *
+     * @type {boolean}
+     * @private
+     */
+    var _automatic = false;
+
+    /**
+     * Sets configuration for automatic reconnection.
+     *
+     * @param {boolean} automatic
+     */
     this.setAutomatic = function(automatic)
     {
-        $automatic = automatic;
+        _automatic = automatic;
     };
 
+    /**
+     * Gets configuration for automatic reconnection.
+     *
+     * @returns {boolean}
+     */
     this.getAutomatic = function()
     {
-        return $automatic;
+        return _automatic;
     };
 
-    var $signin = {
-        method: 'POST',
-        url: '/signin'
-    };
-
-    this.setSignin = function(signin)
-    {
-        angular.extend($signin, signin);
-    };
-
-    this.getSignin = function()
-    {
-        return $signin;
-    };
-
-    var $signout = {
-        method: 'POST',
-        url: '/signout'
-    };
-
-    this.setSignout = function(signout)
-    {
-       angular.extend($signout, signout);
-    };
-
-    this.getSignout = function()
-    {
-        return $signout;
-    };
-
-    var $callbacks = {
+    /**
+     * The configuration for the login and logout.
+     *
+     * @type {{login: {method: string, url: string}, logout: {method: string, url: string}}}
+     * @private
+     */
+    var _config = {
         login: {
-            successful: function(){},
-            error: function(){}
+            method: 'POST',
+            url: '/signin'
         },
         logout: {
-            successful: function(){},
-            error: function(){}
+            method: 'POST',
+            url: '/signout'
         }
     };
 
-    this.setCallbacks = function(callbacks)
+    this.setConfig = function(config)
     {
-        angular.extend($callbacks, callbacks);
+        angular.extend(_config, config);
     };
 
-    this.getCallbacks = function()
-    {
-        return $callbacks;
-    };
-
+    /**
+     * Gets a new instance of AuthService.
+     *
+     * @type {Array}
+     */
     this.$get = [
-        '$authConfig',
-        '$authStorage',
+        '$injector',
+        'authEvents',
+        'authStorage',
         '$rootScope',
         '$http',
         '$q',
         '$cookies',
         'md5',
-    function($authConfig, $authStorage, $rootScope, $http, $q, $cookies, md5)
+    /**
+     * Gets a new instance of AuthService.
+     *
+     * @param {Object} $injector
+     * @param {AuthEvents} authEvents
+     * @param {AuthStorage} authStorage
+     * @param {Object} $rootScope
+     * @param {Object} $http
+     * @param {Object} $q
+     * @param {Object} $cookies
+     * @param {Object} md5
+     * @returns {AuthService}
+     */
+    function($injector, authEvents, authStorage, $rootScope, $http, $q, $cookies, md5)
     {
         return new AuthService({
-            signin: $signin,
-            signout: $signout,
-            callbacks: $callbacks,
-            automatic: $automatic
-        }, $authConfig, $authStorage, $rootScope, $http, $q, $cookies, md5);
+            login: _config.login,
+            logout: _config.logout,
+            callbacks: this.callbacks,
+            automatic: _automatic
+        }, $injector, authEvents, authStorage, $rootScope, $http, $q, $cookies, md5);
     }];
 
 }]);
 /**
- * Stores information to remember user credential
- * and server configuration.
+ * Stores information to remember user credentials
+ * and server information.
  */
-dgAuth.provider('$authStorage', function AuthStorageProvider()
+dgAuth.provider('authStorage', function AuthStorageProvider()
 {
     /**
      * Creates the service for the storage.
@@ -860,61 +956,111 @@ dgAuth.provider('$authStorage', function AuthStorageProvider()
      * Server info are always stored in the
      * session.
      *
-     * @param storage Storage to save user credential.
+     * @param {Storage} storage Storage to save user credentials.
      * @constructor
      */
     function AuthStorage(storage)
     {
-        var $storage = storage;
+        /**
+         * The storage for credentials.
+         *
+         * @type {Storage}
+         * @private
+         */
+        var _storage = storage;
 
+        /**
+         * Checks if the storage has some credentials.
+         *
+         * @returns {boolean}
+         */
         this.hasCredential = function()
         {
-            var username = $storage.getItem('username');
-            var password = $storage.getItem('password');
+            var username = _storage.getItem('username');
+            var password = _storage.getItem('password');
 
             return ((null !== username && null !== password));
         };
 
+        /**
+         * Sets the credentials.
+         *
+         * @param {String} username
+         * @param {String} password
+         */
         this.setCredentials = function(username, password)
         {
-            $storage.setItem('username', username);
-            $storage.setItem('password', password);
+            _storage.setItem('username', username);
+            _storage.setItem('password', password);
         };
 
+        /**
+         * Checks if storage contains the server information.
+         *
+         * @returns {boolean}
+         */
         this.hasServerAuth = function()
         {
             return (null !== sessionStorage.getItem('server'));
         };
 
+        /**
+         * Sets the server information.
+         *
+         * @param {Object} server
+         */
         this.setServerAuth = function(server)
         {
             sessionStorage.setItem('server', JSON.stringify(server));
         };
 
+        /**
+         * Gets the server information.
+         *
+         * @returns {Object}
+         */
         this.getServerAuth = function()
         {
             return JSON.parse(sessionStorage.getItem('server'));
         };
 
+        /**
+         * Gets the username saved in the storage.
+         *
+         * @returns {String}
+         */
         this.getUsername = function()
         {
-            return $storage.getItem('username');
+            return _storage.getItem('username');
         };
 
+        /**
+         * Gets the password saved in the storage.
+         *
+         * @returns {String}
+         */
         this.getPassword = function()
         {
-            return $storage.getItem('password');
+            return _storage.getItem('password');
         };
 
+        /**
+         * Clears the storage.
+         */
         this.clear = function()
         {
-            $storage.clear();
+            _storage.clear();
             sessionStorage.clear();
         };
     }
 
-    // Default storage for user credential.
-    var $storage = sessionStorage;
+    /**
+     * Default storage for user credential.
+     *
+     * @type {Storage}
+     * @private
+     */
+    var _storage = sessionStorage;
 
     /**
      * Sets storage for user credential.
@@ -923,11 +1069,16 @@ dgAuth.provider('$authStorage', function AuthStorageProvider()
      */
     this.setStorage = function(storage)
     {
-        $storage = storage;
+        _storage = storage;
     };
 
+    /**
+     * Gets a new instance of AuthStorage.
+     *
+     * @returns {AuthStorageProvider.AuthStorage}
+     */
     this.$get = function()
     {
-        return new AuthStorage($storage);
+        return new AuthStorage(_storage);
     };
 });

@@ -1,6 +1,6 @@
 {
   "name": "angular-digest-auth",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "filename": "angular-digest-auth.min.js",
   "main": "./dist/angular-digest-auth.min.js",
   "homepage": "https://github.com/mgonto/angular-digest-auth",

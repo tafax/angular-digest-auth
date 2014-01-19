@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.2.0 - 2014-01-18
+ * @version v0.2.1 - 2014-01-19
  * @link https://github.com/mgonto/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -38,9 +38,6 @@ dgAuth.config(['$httpProvider', function($httpProvider)
                 {
                     $rootScope.$broadcast(authEvents.getEvent('process.response'), rejection);
 
-                    if(rejection.mustTerminate)
-                        return $q.reject(rejection);
-
                     
 
                     if(!authServer.parseHeader(rejection))
@@ -49,18 +46,7 @@ dgAuth.config(['$httpProvider', function($httpProvider)
                         return $q.reject(rejection);
                     }
 
-                    var deferred = $q.defer();
-                    var request = {
-                        config: rejection.config,
-                        deferred: deferred
-                    };
-
-                    
-                    $rootScope.$broadcast(authEvents.getEvent('authentication.header'));
-                    $rootScope.$broadcast(authEvents.getEvent('authentication.request'), request);
-                    $rootScope.$broadcast(authEvents.getEvent('login.required'));
-
-                    return deferred.promise;
+                    $rootScope.$broadcast(authEvents.getEvent('authentication.request'));
                 }
 
                 return $q.reject(rejection);
@@ -86,16 +72,6 @@ function($rootScope, authEvents, authService, authClient)
             var login = authService.getCredentials();
             authClient.processRequest(login.username, login.password, request);
         }
-    });
-
-    $rootScope.$on(authEvents.getEvent('process.response'), function(event, response)
-    {
-        authService.mustTerminate(response);
-    });
-
-    $rootScope.$on(authEvents.getEvent('authentication.request'), function(event, request)
-    {
-        authService.setHttpRequest(request);
     });
 }]);
 /**
@@ -354,7 +330,7 @@ dgAuth.provider('authServer', function AuthServerProvider()
      *
      * @constructor
      */
-    function AuthServer(header, authStorage)
+    function AuthServer(header, authStorage, authEvents, $rootScope)
     {
         /**
          * The header string.
@@ -422,20 +398,26 @@ dgAuth.provider('authServer', function AuthServerProvider()
          */
         this.parseHeader = function(response)
         {
-            var header = response.headers(_header);
-
-            if(null !== header)
+            if(!_configured)
             {
-                var splitting = header.split(', ');
+                var header = response.headers(_header);
 
-                for(var i=0; i<splitting.length; i++)
+                if(null !== header)
                 {
-                    var values = _valuePattern.exec(splitting[i]);
-                    this.info[values[1]] = values[2];
-                }
+                    var splitting = header.split(', ');
 
-                authStorage.setServerAuth(this.info);
-                _configured = true;
+                    for(var i=0; i<splitting.length; i++)
+                    {
+                        var values = _valuePattern.exec(splitting[i]);
+                        this.info[values[1]] = values[2];
+                    }
+
+                    authStorage.setServerAuth(this.info);
+                    _configured = true;
+
+                    
+                    $rootScope.$broadcast(authEvents.getEvent('authentication.header'));
+                }
             }
 
             return _configured;
@@ -459,9 +441,9 @@ dgAuth.provider('authServer', function AuthServerProvider()
         _header = header;
     };
 
-    this.$get = ['authStorage', function(authStorage)
+    this.$get = ['authStorage', 'authEvents', '$rootScope', function(authStorage, authEvents, $rootScope)
     {
-        var auth = new AuthServer(_header, authStorage);
+        var auth = new AuthServer(_header, authStorage, authEvents, $rootScope);
 
         if(authStorage.hasServerAuth())
             auth.setConfig(authStorage.getServerAuth());
@@ -573,7 +555,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
         /**
          * The login object.
          *
-         * @type {{username: string, password: string, httpRequest: null, mustTerminate: boolean}}
+         * @type {{username: string, password: string, httpRequest: null, deferred: null, mustTerminate: boolean}}
          */
         var _loginRequest = initLogin();
 
@@ -649,64 +631,64 @@ dgAuth.provider('authService', [function AuthServiceProvider()
             };
         };
 
-        this.mustTerminate = function(response)
-        {
-            if(response.config.url == _login.url)
-            {
-                response.mustTerminate = _loginRequest.mustTerminate;
-                return;
-            }
-
-            if(response.config.url == _logout.url)
-                response.mustTerminate = _logoutRequest.mustTerminate;
-        };
-
-        var performSignin = function()
+        var performLogin = function()
         {
             
 
             var deferred = $q.defer();
 
-            $http(_login)
-                .success(function(data)
-                {
-                    
+            $http(_login).then(function(response)
+            {
+                
 
-                    _identity = data;
+                _identity = response.data;
 
-                    $cookies['_auth'] = md5.createHash('true');
+                $cookies['_auth'] = md5.createHash('true');
 
-                    authStorage.setCredentials(_loginRequest.username, _loginRequest.password);
+                authStorage.setCredentials(_loginRequest.username, _loginRequest.password);
 
-                    $rootScope.$broadcast(authEvents.getEvent('credential.stored'), {
-                        username: _loginRequest.username,
-                        password: _loginRequest.password
-                    });
-
-                    $rootScope.$broadcast(authEvents.getEvent('login.successful'), data);
-
-                    angular.extend(_loginRequest, {
-                        mustTerminate: false
-                    });
-
-                    deferred.resolve(data);
-                })
-                .error(function(data, status)
-                {
-                    
-
-                    $rootScope.$broadcast(authEvents.getEvent('login.error'), data, status);
-
-                    _loginRequest = initLogin();
-
-                    deferred.reject(data);
+                $rootScope.$broadcast(authEvents.getEvent('credential.stored'), {
+                    username: _loginRequest.username,
+                    password: _loginRequest.password
                 });
+
+                $rootScope.$broadcast(authEvents.getEvent('login.successful'), response);
+
+                angular.extend(_loginRequest, {
+                    mustTerminate: false
+                });
+
+                deferred.resolve(response.data);
+            },
+            function(response)
+            {
+                if(!_loginRequest.mustTerminate)
+                {
+                    
+
+                    $rootScope.$broadcast(authEvents.getEvent('login.required'));
+
+                    deferred.notify();
+                }
+                else
+                {
+                    
+
+                    $rootScope.$broadcast(authEvents.getEvent('login.error'), response);
+
+                    deferred.reject(response.data);
+                }
+
+                _loginRequest = initLogin();
+            });
 
             return deferred;
         };
 
         /**
-         * Performs the login.
+         * Signs in a user.
+         *
+         * @returns {promise|*|promise|promise|Function|promise}
          */
         this.signin = function()
         {
@@ -727,78 +709,60 @@ dgAuth.provider('authService', [function AuthServiceProvider()
                 }
             }
 
-            if(!_loginRequest.httpRequest)
+            if(!_loginRequest.deferred)
             {
-                if(!_loginRequest.deferred)
+                _loginRequest.deferred = performLogin();
+                for(var i in _callbacks.login)
                 {
-                    _loginRequest.deferred = performSignin();
-                    for(var i in _callbacks.login)
-                    {
-                        var callback = $injector.invoke(_callbacks.login[i]);
-                        _loginRequest.deferred.promise.then(callback.successful, callback.error);
-                    }
+                    var callback = $injector.invoke(_callbacks.login[i]);
+                    _loginRequest.deferred.promise.then(callback.successful, callback.error, callback.required);
                 }
-            }
-            else
-            {
-                var promise = $http(_loginRequest.httpRequest.config).then(function(response)
-                {
-                    _loginRequest.httpRequest.deferred.resolve(response);
-                },
-                function(response)
-                {
-                    _loginRequest.httpRequest.deferred.reject(response);
-                });
-
-                promise['finally'](function()
-                {
-                    _loginRequest.httpRequest = null;
-                });
             }
 
             return _loginRequest.deferred.promise;
         };
 
-        var performSignout = function()
+        var performLogout = function()
         {
             
 
             var deferred = $q.defer();
 
-            $http(_logout)
-                .success(function(data)
-                {
-                    
+            $http(_logout).then(function(response)
+            {
+                
 
-                    $cookies['_auth'] = md5.createHash('false');
+                $cookies['_auth'] = md5.createHash('false');
 
-                    _identity = null;
-                    _loginRequest = initLogin();
+                _identity = null;
+                _loginRequest = initLogin();
 
-                    $rootScope.$broadcast(authEvents.getEvent('logout.successful'), data);
+                $rootScope.$broadcast(authEvents.getEvent('logout.successful'), response);
 
-                    deferred.resolve(data);
-                })
-                .error(function(data, status)
-                {
-                    
+                deferred.resolve(response.data);
+            },
+            function(response)
+            {
+                
 
-                    $rootScope.$broadcast(authEvents.getEvent('logout.error'), data, status);
+                $rootScope.$broadcast(authEvents.getEvent('logout.error'), response);
 
-                    deferred.reject(data);
-                });
+                deferred.reject(response.data);
+            });
 
             return deferred;
         };
 
         /**
-         * Performs the logout.
+         * Signs out the current user.
+         *
+         * @returns {promise|*|promise|promise|Function|promise}
          */
         this.signout = function()
         {
             if(!_logoutRequest.deferred)
             {
-                _logoutRequest.deferred = performSignout();
+                _logoutRequest.deferred = performLogout();
                 for(var i in _callbacks.logout)
                 {
                     var callbacks = $injector.invoke(_callbacks.logout[i]);
@@ -820,9 +784,9 @@ dgAuth.provider('authService', [function AuthServiceProvider()
 
             if(_logoutRequest.deferred)
             {
-                _logoutRequest.deferred.promise.then(function()
+                _logoutRequest.deferred.promise.then(function(response)
                     {
-                        deferred.reject(null);
+                        deferred.reject(response.data);
                     },
                     function()
                     {
@@ -835,9 +799,9 @@ dgAuth.provider('authService', [function AuthServiceProvider()
                     {
                         deferred.resolve(($cookies['_auth'] == md5.createHash('true') && null !== _identity));
                     },
-                    function(reason)
+                    function(response)
                     {
-                        deferred.reject(reason);
+                        deferred.reject(response.data);
                     });
             }
 

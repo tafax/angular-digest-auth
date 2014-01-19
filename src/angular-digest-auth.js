@@ -31,9 +31,6 @@ dgAuth.config(['$httpProvider', function($httpProvider)
                 {
                     $rootScope.$broadcast(authEvents.getEvent('process.response'), rejection);
 
-                    if(rejection.mustTerminate)
-                        return $q.reject(rejection);
-
                     console.debug("Server has requested an authentication.");
 
                     if(!authServer.parseHeader(rejection))
@@ -42,18 +39,7 @@ dgAuth.config(['$httpProvider', function($httpProvider)
                         return $q.reject(rejection);
                     }
 
-                    var deferred = $q.defer();
-                    var request = {
-                        config: rejection.config,
-                        deferred: deferred
-                    };
-
-                    console.debug('Parse header for authentication.');
-                    $rootScope.$broadcast(authEvents.getEvent('authentication.header'));
-                    $rootScope.$broadcast(authEvents.getEvent('authentication.request'), request);
-                    $rootScope.$broadcast(authEvents.getEvent('login.required'));
-
-                    return deferred.promise;
+                    $rootScope.$broadcast(authEvents.getEvent('authentication.request'));
                 }
 
                 return $q.reject(rejection);
@@ -79,15 +65,5 @@ function($rootScope, authEvents, authService, authClient)
             var login = authService.getCredentials();
             authClient.processRequest(login.username, login.password, request);
         }
-    });
-
-    $rootScope.$on(authEvents.getEvent('process.response'), function(event, response)
-    {
-        authService.mustTerminate(response);
-    });
-
-    $rootScope.$on(authEvents.getEvent('authentication.request'), function(event, request)
-    {
-        authService.setHttpRequest(request);
     });
 }]);

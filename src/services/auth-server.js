@@ -8,7 +8,7 @@ dgAuth.provider('authServer', function AuthServerProvider()
      *
      * @constructor
      */
-    function AuthServer(header, authStorage)
+    function AuthServer(header, authStorage, authEvents, $rootScope)
     {
         /**
          * The header string.
@@ -76,20 +76,26 @@ dgAuth.provider('authServer', function AuthServerProvider()
          */
         this.parseHeader = function(response)
         {
-            var header = response.headers(_header);
-
-            if(null !== header)
+            if(!_configured)
             {
-                var splitting = header.split(', ');
+                var header = response.headers(_header);
 
-                for(var i=0; i<splitting.length; i++)
+                if(null !== header)
                 {
-                    var values = _valuePattern.exec(splitting[i]);
-                    this.info[values[1]] = values[2];
-                }
+                    var splitting = header.split(', ');
 
-                authStorage.setServerAuth(this.info);
-                _configured = true;
+                    for(var i=0; i<splitting.length; i++)
+                    {
+                        var values = _valuePattern.exec(splitting[i]);
+                        this.info[values[1]] = values[2];
+                    }
+
+                    authStorage.setServerAuth(this.info);
+                    _configured = true;
+
+                    console.debug('Parse header for authentication.');
+                    $rootScope.$broadcast(authEvents.getEvent('authentication.header'));
+                }
             }
 
             return _configured;
@@ -113,9 +119,9 @@ dgAuth.provider('authServer', function AuthServerProvider()
         _header = header;
     };
 
-    this.$get = ['authStorage', function(authStorage)
+    this.$get = ['authStorage', 'authEvents', '$rootScope', function(authStorage, authEvents, $rootScope)
     {
-        var auth = new AuthServer(_header, authStorage);
+        var auth = new AuthServer(_header, authStorage, authEvents, $rootScope);
 
         if(authStorage.hasServerAuth())
             auth.setConfig(authStorage.getServerAuth());

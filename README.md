@@ -61,8 +61,7 @@ app.config(['authServiceProvider', function(authServiceProvider)
 {
     /**
      * You can add the callbacks to manage what happens after
-     * successful of the login. You can specify both two functions
-     * or just one.
+     * successful of the login.
      */
     authServiceProvider.callbacks.login.push(['serviceInject', function(serviceInject)
     {
@@ -74,6 +73,10 @@ app.config(['authServiceProvider', function(authServiceProvider)
             error: function(error)
             {
                 //Your code to manage the login error.
+            },
+            required: function()
+            {
+                //Your code to manage the need for a login.
             }
         };
     }]);
@@ -82,10 +85,9 @@ app.config(['authServiceProvider', function(authServiceProvider)
 
     /**
      * You can add the callbacks to manage what happens after
-     * successful of the logout. You can specify both two functions
-     * or just one.
+     * successful of the logout.
      */
-    authServiceProvider.callbacks.login.push(['serviceInject', function(serviceInject)
+    authServiceProvider.callbacks.logout.push(['serviceInject', function(serviceInject)
     {
         return {
             successful: function(data)
@@ -127,28 +129,20 @@ Obviously, if you want to specify your own storage object, you can :).
 
 #Usage
 For basic usage, you can launch the `signin()` when your app goes run.
-Then, you can handle one base event: `signin.required`.
 ````javascript
-app.run(['authService', 'authEvents', '$rootScope', function(authService, authEvents, $rootScope)
+app.run(['authService', function(authService)
 {
     /**
      * It tries to sign in. If the service doesn't find
      * the credentials stored or the user is not signed in yet,
-     * the service launch a signin.required event.
+     * the service executes the required function.
      */
     authService.signin();
-
-    /**
-     * The event is fired when a login is required.
-     */
-    $rootScope.$on(authEvents.getEvent('signin.required'), function(event)
-    {
-        //Redirect user to your login page. Ex: $location.path('/path/to/login');
-    });
 }]);
 ````
 
 In your login controller you should provide the credentials submitted by user.
+Then you have to sign in another time.
 ````javascript
 $scope.submit = function(user)
 {
@@ -156,8 +150,6 @@ $scope.submit = function(user)
     authService.signin();
 };
 ````
-
-After this, the service performs a login again without doing any more.
 
 #Authorization
 You can use a functionality of authService to authorize the user to navigate in your app.
@@ -173,7 +165,6 @@ app.config(['$routeProvider', function($routeProvider)
      * Use a variable in resolve to authorize the users.
      * The method 'isAuthenticated()' returns a promise
      * which you can use to validate the requests.
-     * The promise is resolved after user login or logout.
      */
     $routeProvider.when('some/path', {
         ...
@@ -200,8 +191,7 @@ app.config(['$routeProvider', function($routeProvider)
 ````
 
 #Events
-The module uses several events to provide its functionality. You can use the list of all events to handle
-the module environment.
+You can use the events to handle the module environment.
 ````javascript
 authentication: {
     headerNotFound: //After a login request no header has been found.
@@ -212,12 +202,12 @@ process: {
     request: //A request is processed by the module.
     response: //A response with status 401 is processed by the module.
 },
-signin: {
+login: {
     successful: //The login is successful.
     error: //The login responds with an error.
     required: //The login is required to access a functionality.
 },
-signout: {
+logout: {
     successful: //The logout is successful
     error: //The logout responds with an error.
 },
@@ -228,8 +218,8 @@ credential: {
 }
 ````
 
-You can use the `authEvents` service to handle the events and do your own tasks. For example, with
-`authEvents.getEvent('signin.error')` you can handle if an error appears in the login procedure and
+Use the `authEvents` service to handle the events and do your own tasks. For example, with
+`authEvents.getEvent('login.error')` you can handle if an error appears in the login procedure and
 afterwards you can notify this error in your view to the user.
 Also you can specify your events.
 ````javascript
@@ -242,6 +232,7 @@ app.config(['authEventsProvider', function(authEventsProvider)
         credential: {
             restored: 'my_credential_event'
         }
+        ...
     });
 }]);
 ````

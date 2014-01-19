@@ -57,7 +57,7 @@ describe('angular-digest-auth', function()
                         expect(authService.getIdentity()).toEqual(null);
                         expect(authService.hasIdentity()).toEqual(false);
                     },
-                    request: function()
+                    required: function()
                     {
                         expect(authService.getIdentity()).toEqual(null);
                         expect(authService.hasIdentity()).toEqual(false);

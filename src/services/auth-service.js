@@ -261,7 +261,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
                 for(var i in _callbacks.login)
                 {
                     var callback = $injector.invoke(_callbacks.login[i]);
-                    _loginRequest.deferred.promise.then(callback.successful, callback.error, callback.request);
+                    _loginRequest.deferred.promise.then(callback.successful, callback.error, callback.required);
                 }
             }
 

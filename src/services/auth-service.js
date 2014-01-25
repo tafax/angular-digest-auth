@@ -10,7 +10,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
      *
      * @constructor
      */
-    function AuthService(callbacks, $injector, authEvents, authStorage, $rootScope, $q)
+    function AuthService(callbacks, $injector, stateMachine, authEvents, authStorage, $rootScope, $q)
     {
         /**
          *
@@ -163,6 +163,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
      */
     this.$get = [
         '$injector',
+        'stateMachine',
         'authEvents',
         'authStorage',
         '$rootScope',
@@ -177,9 +178,9 @@ dgAuth.provider('authService', [function AuthServiceProvider()
      * @param {Object} $q
      * @returns {AuthService}
      */
-    function($injector, authEvents, authStorage, $rootScope, $q)
+    function($injector, stateMachine, authEvents, authStorage, $rootScope, $q)
     {
-        return new AuthService(this.callbacks, $injector, authEvents, authStorage, $rootScope, $q);
+        return new AuthService(this.callbacks, $injector, stateMachine, authEvents, authStorage, $rootScope, $q);
     }];
 
 }]);

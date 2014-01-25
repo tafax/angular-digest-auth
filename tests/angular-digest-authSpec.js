@@ -183,7 +183,81 @@ describe('angular-digest-auth', function()
             _stateMachine.initialize();
         });
 
-        it('should restore the credentials and sign in', function()
+        it('should restore the info and ask for the credentials', function()
+        {
+            _authServer.info = {
+                realm: 'Test Authentication Realm',
+                domain: '/',
+                nonce: _md5.createHash('nonce'),
+                opaque: _md5.createHash('opaque'),
+                algorithm: 'MD5',
+                qop: 'auth'
+            };
+
+            spyOn(_authServer, 'isConfigured').andReturn(true);
+
+            spyOn(_authStorage, 'hasCredentials').andReturn(false);
+            spyOn(_authStorage, 'getUsername');
+            spyOn(_authStorage, 'getPassword');
+
+            _stateMachine.send('run');
+
+            expect(_authStorage.hasCredentials).toHaveBeenCalled();
+            expect(_authStorage.getUsername).not.toHaveBeenCalled();
+            expect(_authStorage.getPassword).not.toHaveBeenCalled();
+
+            spyOn(_authService, 'setCredentials').andCallThrough();
+            spyOn(_authService, 'clearCredentials').andCallThrough();
+            spyOn(_authService, 'getCallbacks').andCallThrough();
+
+            _stateMachine.send('restored');
+
+            expect(_authService.setCredentials).not.toHaveBeenCalled();
+
+            spyOn(_authRequests, 'signin').andCallThrough();
+
+            _stateMachine.send('signin');
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeTruthy();
+            });
+
+            expect(_authRequests.signin).toHaveBeenCalled();
+            expect(_authStorage.hasCredentials).toHaveBeenCalled();
+
+            _httpBackend.expectPOST('/signin');
+            _httpBackend.flush(1);
+
+            expect(_authService.clearCredentials).toHaveBeenCalled();
+            expect(_authService.getCallbacks).toHaveBeenCalledWith('login.request');
+
+            _stateMachine.send('submitted', {
+                credentials: {
+                    username: 'test',
+                    password: 'test'
+                }
+            });
+
+            expect(_authService.setCredentials).toHaveBeenCalledWith('test', 'test');
+
+            spyOn(_authIdentity, 'set').andCallThrough();
+
+            _stateMachine.send('signin');
+
+            _httpBackend.expectPOST('/signin');
+            _httpBackend.flush(1);
+
+            expect(_authIdentity.set).toHaveBeenCalled();
+            expect(_authService.getCallbacks).toHaveBeenCalled();
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeTruthy();
+            });
+        });
+
+        it('should restore the credentials, info and sign in', function()
         {
             _authServer.info = {
                 realm: 'Test Authentication Realm',

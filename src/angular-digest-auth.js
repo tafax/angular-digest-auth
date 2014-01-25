@@ -4,7 +4,7 @@
  * dgAuth provides functionality to manage
  * user authentication
  */
-var dgAuth = angular.module('dgAuth', ['angular-md5', 'ngCookies']);
+var dgAuth = angular.module('dgAuth', ['angular-md5', 'ngCookies', 'FSM']);
 
 /**
  * Configures http to intercept requests and responses with error 401.
@@ -14,14 +14,20 @@ dgAuth.config(['$httpProvider', function($httpProvider)
     $httpProvider.interceptors.push([
         '$rootScope',
         '$q',
+        'authService',
+        'authClient',
         'authServer',
-        'authEvents',
-    function($rootScope, $q, authServer, authEvents)
+        'stateMachine',
+    function($rootScope, $q, authService, authClient, authServer, stateMachine)
     {
         return {
             'request': function(request)
             {
-                $rootScope.$broadcast(authEvents.getEvent('process.request'), request);
+                var login = authService.getCredentials();
+                var header = authClient.processRequest(login.username, login.password, request.method, request.url);
+
+                if(header)
+                    request.headers['Authorization'] = header;
 
                 return (request || $q.when(request));
             },
@@ -29,17 +35,19 @@ dgAuth.config(['$httpProvider', function($httpProvider)
             {
                 if(rejection.status === 401)
                 {
-                    $rootScope.$broadcast(authEvents.getEvent('process.response'), rejection);
-
                     console.debug("Server has requested an authentication.");
 
                     if(!authServer.parseHeader(rejection))
                     {
-                        $rootScope.$broadcast(authEvents.getEvent('authentication.notFound'));
                         return $q.reject(rejection);
                     }
 
-                    $rootScope.$broadcast(authEvents.getEvent('authentication.request'));
+                    var deferred = $q.defer();
+
+                    authService.setRequest(rejection.config, deferred);
+                    stateMachine.send('401', {response: rejection});
+
+                    return deferred.promise;
                 }
 
                 return $q.reject(rejection);
@@ -58,12 +66,5 @@ dgAuth.run([
     'authClient',
 function($rootScope, authEvents, authService, authClient)
 {
-    $rootScope.$on(authEvents.getEvent('process.request'), function(event, request)
-    {
-        if(authClient.isConfigured())
-        {
-            var login = authService.getCredentials();
-            authClient.processRequest(login.username, login.password, request);
-        }
-    });
+
 }]);

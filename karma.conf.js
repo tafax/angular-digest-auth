@@ -18,13 +18,17 @@ module.exports = function(config) {
       'lib/angular-cookies/angular-cookies.min.js',
       'lib/angular-mocks/angular-mocks.js',
       'lib/angular-md5/angular-md5.js',
+      'lib/angular-state-machine/dist/angular-state-machine.min.js',
       'src/angular-digest-auth.js',
+      'src/angular-digest-auth-fsm.js',
       'src/services/auth-client.js',
       'src/services/auth-events.js',
+      'src/services/auth-identity.js',
       'src/services/auth-server.js',
       'src/services/auth-service.js',
+      'src/services/auth-requests.js',
       'src/services/auth-storage.js',
-      'tests/**/*.js'
+      'tests/**/*Spec.js'
     ],
 
 

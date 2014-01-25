@@ -76,26 +76,22 @@ dgAuth.provider('authServer', function AuthServerProvider()
          */
         this.parseHeader = function(response)
         {
-            if(!_configured)
+            var header = response.headers(_header);
+
+            _configured = false;
+
+            if(null !== header)
             {
-                var header = response.headers(_header);
+                var splitting = header.split(', ');
 
-                if(null !== header)
+                for(var i=0; i<splitting.length; i++)
                 {
-                    var splitting = header.split(', ');
-
-                    for(var i=0; i<splitting.length; i++)
-                    {
-                        var values = _valuePattern.exec(splitting[i]);
-                        this.info[values[1]] = values[2];
-                    }
-
-                    authStorage.setServerAuth(this.info);
-                    _configured = true;
-
-                    console.debug('Parse header for authentication.');
-                    $rootScope.$broadcast(authEvents.getEvent('authentication.header'));
+                    var values = _valuePattern.exec(splitting[i]);
+                    this.info[values[1]] = values[2];
                 }
+
+                authStorage.setServerAuth(this.info);
+                _configured = true;
             }
 
             return _configured;

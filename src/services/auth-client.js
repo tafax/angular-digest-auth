@@ -73,12 +73,12 @@ function($rootScope, authServer, md5)
         /**
          * Generate the response.
          *
-         * @param {String} username The username.
-         * @param {String} password The password.
-         * @param {String} method Method used for the request.
-         * @param {String} uri Uri of the resource requested.
-         * @param {String} nc The progressive nc.
-         * @param {String} cnonce The cnonce.
+         * @param {string} username The username.
+         * @param {string} password The password.
+         * @param {string} method Method used for the request.
+         * @param {string} uri Uri of the resource requested.
+         * @param {string} nc The progressive nc.
+         * @param {string} cnonce The cnonce.
          * @returns {string}
          */
         var generateResponse = function(username, password, method, uri, nc, cnonce)
@@ -91,10 +91,10 @@ function($rootScope, authServer, md5)
         /**
          * Aggregates all information to generate header.
          *
-         * @param {String} username The username.
-         * @param {String} password The password.
-         * @param {String} method Method used for the request.
-         * @param {String} uri Uri of the resource requested.
+         * @param {string} username The username.
+         * @param {string} password The password.
+         * @param {string} method Method used for the request.
+         * @param {string} uri Uri of the resource requested.
          * @returns {string}
          */
         var generateHeader = function(username, password, method, uri)
@@ -107,10 +107,10 @@ function($rootScope, authServer, md5)
                 "realm=\"" + authServer.info.realm + "\", " +
                 "nonce=\"" + authServer.info.nonce + "\", " +
                 "uri=\"" + uri + "\", " +
-                "algorithm=" + authServer.algorithm + ", " +
+                "algorithm=\"" + authServer.info.algorithm + "\", " +
                 "response=\"" + generateResponse(username, password, method, uri, nc, cnonce) + "\", " +
                 "opaque=\"" + authServer.info.opaque + "\", " +
-                "qop=" + authServer.info.qop + ", " +
+                "qop=\"" + authServer.info.qop + "\", " +
                 "nc=\"" + nc + "\", " +
                 "cnonce=\"" + cnonce + "\"";
         };
@@ -130,14 +130,23 @@ function($rootScope, authServer, md5)
          * Process a request and add the authorization header
          * if the request need an authentication.
          *
-         * @param {String} username The username.
-         * @param {String} password The password.
-         * @param {Object} request The current request.
+         * @param {string} username The username.
+         * @param {string} password The password.
+         * @param {string} method The method of the request.
+         * @param {string} url The url of the request.
+         * @returns {string|null}
          */
-        this.processRequest = function(username, password, request)
+        this.processRequest = function(username, password, method, url)
         {
-            if(request.url.indexOf(authServer.info.domain) >= 0)
-                request.headers['Authorization'] = generateHeader(username, password, request.method, request.url);
+            var header = null;
+
+            if(this.isConfigured())
+            {
+                if(url.indexOf(authServer.info.domain) >= 0)
+                    header = generateHeader(username, password, method, url);
+            }
+
+            return header;
         };
     }
 

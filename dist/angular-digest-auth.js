@@ -694,7 +694,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
         {
             if($cookies['_auth'] == md5.createHash('true') || _automatic)
             {
-                if(authStorage.hasCredential())
+                if(authStorage.hasCredentials())
                 {
                     angular.extend(_loginRequest, {
                         username: authStorage.getUsername(),
@@ -778,7 +778,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
          *
          * @returns {promise|*}
          */
-        this.isAuthenticated = function()
+        this.isAuthorized = function()
         {
             var deferred = $q.defer();
 
@@ -938,7 +938,7 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
          *
          * @returns {boolean}
          */
-        this.hasCredential = function()
+        this.hasCredentials = function()
         {
             var username = _storage.getItem('username');
             var password = _storage.getItem('password');

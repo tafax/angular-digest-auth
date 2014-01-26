@@ -199,37 +199,30 @@ describe('Authentication Requests Specifications', function()
 
         it('should respect the limit', function()
         {
-            _authRequests.signin();
+            for(var i=0; i<4; i++)
+            {
+                _authRequests.signin();
 
-            _httpBackend.expectPOST('/signin');
-            _httpBackend.flush(1);
+                _httpBackend.expectPOST('/signin');
+                _httpBackend.flush(1);
 
-            expect(_stateMachine.send).toHaveBeenCalled();
-            expect(_authRequests.getValid()).toBeTruthy();
+                expect(_stateMachine.send).toHaveBeenCalled();
+                expect(_authRequests.getValid()).toBeTruthy();
+            }
+        });
 
-            _authRequests.signin();
+        it('should exceed the limit', function()
+        {
+            for(var i=0; i<4; i++)
+            {
+                _authRequests.signin();
 
-            _httpBackend.expectPOST('/signin');
-            _httpBackend.flush(1);
+                _httpBackend.expectPOST('/signin');
+                _httpBackend.flush(1);
 
-            expect(_stateMachine.send).toHaveBeenCalled();
-            expect(_authRequests.getValid()).toBeTruthy();
-
-            _authRequests.signin();
-
-            _httpBackend.expectPOST('/signin');
-            _httpBackend.flush(1);
-
-            expect(_stateMachine.send).toHaveBeenCalled();
-            expect(_authRequests.getValid()).toBeTruthy();
-
-            _authRequests.signin();
-
-            _httpBackend.expectPOST('/signin');
-            _httpBackend.flush(1);
-
-            expect(_stateMachine.send).toHaveBeenCalled();
-            expect(_authRequests.getValid()).toBeTruthy();
+                expect(_stateMachine.send).toHaveBeenCalled();
+                expect(_authRequests.getValid()).toBeTruthy();
+            }
 
             _authRequests.signin();
 
@@ -238,20 +231,6 @@ describe('Authentication Requests Specifications', function()
 
             expect(_stateMachine.send).toHaveBeenCalled();
             expect(_authRequests.getValid()).toBeFalsy();
-        });
-    });
-
-    describe('limit set to infinite', function()
-    {
-        beforeEach(function()
-        {
-            var fake = angular.module('test.config', []);
-            fake.config(['authRequestsProvider', function(authRequestsProvider)
-            {
-                authRequestsProvider.setLimit('inf');
-            }]);
-
-            module('dgAuth', 'test.config');
         });
     });
 });

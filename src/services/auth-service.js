@@ -10,7 +10,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
      *
      * @constructor
      */
-    function AuthService(callbacks, $injector, stateMachine, authEvents, authStorage, $rootScope, $q)
+    function AuthService(callbacks, $injector)
     {
         /**
          *
@@ -172,15 +172,11 @@ dgAuth.provider('authService', [function AuthServiceProvider()
      * Gets a new instance of AuthService.
      *
      * @param {Object} $injector
-     * @param {AuthEvents} authEvents
-     * @param {AuthStorage} authStorage
-     * @param {Object} $rootScope
-     * @param {Object} $q
      * @returns {AuthService}
      */
-    function($injector, stateMachine, authEvents, authStorage, $rootScope, $q)
+    function($injector)
     {
-        return new AuthService(this.callbacks, $injector, stateMachine, authEvents, authStorage, $rootScope, $q);
+        return new AuthService(this.callbacks, $injector);
     }];
 
 }]);

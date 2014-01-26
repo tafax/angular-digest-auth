@@ -108,7 +108,7 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
 
                 authIdentity.clear();
                 authService.clearCredentials();
-                var callbacksLogin = authService.getCallbacks('login.request');
+                var callbacksLogin = authService.getCallbacks('login.required');
                 for(var j in callbacksLogin)
                 {
                     var funcRequest = callbacksLogin[j];
@@ -156,6 +156,19 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
             action: ['authRequests', function(authRequests)
             {
                 authRequests.signout();
+            }]
+        },
+        failureLogin: {
+            action: ['authService', 'authIdentity', 'params', function(authService, authIdentity, params)
+            {
+                authIdentity.clear();
+                authService.clearCredentials();
+                var callbacksLogin = authService.getCallbacks('login.limit');
+                for(var j in callbacksLogin)
+                {
+                    var funcLimit = callbacksLogin[j];
+                    funcLimit(params.response);
+                }
             }]
         }
     });

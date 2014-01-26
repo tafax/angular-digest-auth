@@ -3,11 +3,13 @@
 describe('Authentication Requests Specifications', function()
 {
     var _authRequests;
-    var _httpBackend;
 
     var _stateMachine;
     var _authService;
+    var _authServer;
+
     var _http;
+    var _httpBackend;
     var _q;
 
     var _fail = false;
@@ -19,11 +21,12 @@ describe('Authentication Requests Specifications', function()
         inject(function($injector)
         {
             _authRequests = $injector.get('authRequests');
-            _httpBackend = $injector.get('$httpBackend');
-
             _stateMachine = $injector.get('stateMachine');
-            _authService = $injector.get('authService');
 
+            _authService = $injector.get('authService');
+            _authServer = $injector.get('authServer');
+
+            _httpBackend = $injector.get('$httpBackend');
             _http = $injector.get('$http');
             _q = $injector.get('$q');
 
@@ -190,15 +193,51 @@ describe('Authentication Requests Specifications', function()
         beforeEach(function()
         {
             _fail = true;
+
+            spyOn(_authServer, 'parseHeader').andReturn(true);
         });
 
         it('should respect the limit', function()
         {
-            //TODO: mock the authServer to not parse the header on response
             _authRequests.signin();
 
             _httpBackend.expectPOST('/signin');
             _httpBackend.flush(1);
+
+            expect(_stateMachine.send).toHaveBeenCalled();
+            expect(_authRequests.getValid()).toBeTruthy();
+
+            _authRequests.signin();
+
+            _httpBackend.expectPOST('/signin');
+            _httpBackend.flush(1);
+
+            expect(_stateMachine.send).toHaveBeenCalled();
+            expect(_authRequests.getValid()).toBeTruthy();
+
+            _authRequests.signin();
+
+            _httpBackend.expectPOST('/signin');
+            _httpBackend.flush(1);
+
+            expect(_stateMachine.send).toHaveBeenCalled();
+            expect(_authRequests.getValid()).toBeTruthy();
+
+            _authRequests.signin();
+
+            _httpBackend.expectPOST('/signin');
+            _httpBackend.flush(1);
+
+            expect(_stateMachine.send).toHaveBeenCalled();
+            expect(_authRequests.getValid()).toBeTruthy();
+
+            _authRequests.signin();
+
+            _httpBackend.expectPOST('/signin');
+            _httpBackend.flush(1);
+
+            expect(_stateMachine.send).toHaveBeenCalled();
+            expect(_authRequests.getValid()).toBeFalsy();
         });
     });
 

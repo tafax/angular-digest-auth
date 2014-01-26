@@ -1,3 +1,5 @@
+'use strict';
+
 describe('Authentication Requests Specifications', function()
 {
     var _authRequests;
@@ -7,6 +9,8 @@ describe('Authentication Requests Specifications', function()
     var _authService;
     var _http;
     var _q;
+
+    var _fail = false;
 
     beforeEach(angular.mock.module('dgAuth'));
 
@@ -19,6 +23,7 @@ describe('Authentication Requests Specifications', function()
 
             _stateMachine = $injector.get('stateMachine');
             _authService = $injector.get('authService');
+
             _http = $injector.get('$http');
             _q = $injector.get('$q');
 
@@ -26,6 +31,9 @@ describe('Authentication Requests Specifications', function()
 
             _httpBackend.whenPOST('/signin').respond(function()
             {
+                if(_fail)
+                    return [401, '401', ''];
+
                 return [201, '201', ''];
             });
 
@@ -114,8 +122,6 @@ describe('Authentication Requests Specifications', function()
             _httpBackend.expectGET('/request');
             _httpBackend.flush(1);
         });
-
-        it('should');
     });
 
     describe('tests logout http requests', function()
@@ -176,6 +182,37 @@ describe('Authentication Requests Specifications', function()
 
             _httpBackend.expectGET('/request');
             _httpBackend.flush(1);
+        });
+    });
+
+    describe('limit set to default', function()
+    {
+        beforeEach(function()
+        {
+            _fail = true;
+        });
+
+        it('should respect the limit', function()
+        {
+            //TODO: mock the authServer to not parse the header on response
+            _authRequests.signin();
+
+            _httpBackend.expectPOST('/signin');
+            _httpBackend.flush(1);
+        });
+    });
+
+    describe('limit set to infinite', function()
+    {
+        beforeEach(function()
+        {
+            var fake = angular.module('test.config', []);
+            fake.config(['authRequestsProvider', function(authRequestsProvider)
+            {
+                authRequestsProvider.setLimit('inf');
+            }]);
+
+            module('dgAuth', 'test.config');
         });
     });
 });

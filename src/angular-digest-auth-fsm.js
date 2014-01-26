@@ -45,16 +45,23 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                 //Checks if the credentials are present(loginError) or not(waitingCredentials)
                 401: [{
                     to: 'waitingCredentials',
-                    predicate: ['authService', function(authService)
+                    predicate: ['authService', 'authRequests', function(authService, authRequests)
                     {
-                        return !authService.hasCredentials();
+                        return (!authService.hasCredentials() && authRequests.getValid());
                     }]
                 },
                 {
                     to: 'loginError',
-                    predicate: ['authService', function(authService)
+                    predicate: ['authService', 'authRequests', function(authService, authRequests)
                     {
-                        return authService.hasCredentials();
+                        return (authService.hasCredentials() && authRequests.getValid());
+                    }]
+                },
+                {
+                    to: 'failureLogin',
+                    predicate: ['authRequests', function(authRequests)
+                    {
+                        return !authRequests.getValid();
                     }]
                 }],
                 201: 'loggedIn'
@@ -91,26 +98,28 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                 if(name == 'logoutRequest')
                 {
                     authIdentity.clear();
-                    var callbacks = authService.getCallbacks('logout.successful');
-                    for(var i in callbacks)
+                    var callbacksLogout = authService.getCallbacks('logout.successful');
+                    for(var i in callbacksLogout)
                     {
-                        var callback = callbacks[i];
-                        callback(params.response);
+                        var funcSuccessful = callbacksLogout[i];
+                        funcSuccessful(params.response);
                     }
                 }
 
+                authIdentity.clear();
                 authService.clearCredentials();
-                callbacks = authService.getCallbacks('login.request');
-                for(var j in callbacks)
+                var callbacksLogin = authService.getCallbacks('login.request');
+                for(var j in callbacksLogin)
                 {
-                    var func = callbacks[j];
-                    func(params.response);
+                    var funcRequest = callbacksLogin[j];
+                    funcRequest(params.response);
                 }
             }]
         },
         loggedIn: {
             transitions: {
-                signout: 'logoutRequest'
+                signout: 'logoutRequest',
+                401: 'waitingCredentials'
             },
             //Checks the previous state and creates the identity and notify the login successful
             action: ['authService', 'authIdentity', 'name', 'params', function(authService, authIdentity, name, params)

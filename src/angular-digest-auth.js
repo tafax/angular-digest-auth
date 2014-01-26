@@ -35,8 +35,6 @@ dgAuth.config(['$httpProvider', function($httpProvider)
             {
                 if(rejection.status === 401)
                 {
-                    console.debug("Server has requested an authentication.");
-
                     if(!authServer.parseHeader(rejection))
                     {
                         return $q.reject(rejection);

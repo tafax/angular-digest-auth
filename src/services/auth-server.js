@@ -1,14 +1,14 @@
 /**
  * Parses and provides server information for the authentication.
  */
-dgAuth.provider('authServer', function AuthServerProvider()
+dgAuth.provider('authServer', ['dgAuthServiceProvider', function AuthServerProvider(dgAuthServiceProvider)
 {
     /**
      * Creates the service for the server info.
      *
      * @constructor
      */
-    function AuthServer(header, authStorage, authEvents, $rootScope)
+    function AuthServer(header, authStorage)
     {
         /**
          * The header string.
@@ -76,56 +76,35 @@ dgAuth.provider('authServer', function AuthServerProvider()
          */
         this.parseHeader = function(response)
         {
-            if(!_configured)
+            var header = response.headers(_header);
+
+            _configured = false;
+
+            if(null !== header)
             {
-                var header = response.headers(_header);
+                var splitting = header.split(', ');
 
-                if(null !== header)
+                for(var i=0; i<splitting.length; i++)
                 {
-                    var splitting = header.split(', ');
-
-                    for(var i=0; i<splitting.length; i++)
-                    {
-                        var values = _valuePattern.exec(splitting[i]);
-                        this.info[values[1]] = values[2];
-                    }
-
-                    authStorage.setServerAuth(this.info);
-                    _configured = true;
-
-                    console.debug('Parse header for authentication.');
-                    $rootScope.$broadcast(authEvents.getEvent('authentication.header'));
+                    var values = _valuePattern.exec(splitting[i]);
+                    this.info[values[1]] = values[2];
                 }
+
+                authStorage.setServerAuth(this.info);
+                _configured = true;
             }
 
             return _configured;
         };
     }
 
-    /**
-     * The header string.
-     *
-     * @type {string}
-     */
-    var _header = '';
-
-    /**
-     * Sets the header.
-     *
-     * @param {String} header
-     */
-    this.setHeader = function(header)
+    this.$get = ['authStorage', function(authStorage)
     {
-        _header = header;
-    };
-
-    this.$get = ['authStorage', 'authEvents', '$rootScope', function(authStorage, authEvents, $rootScope)
-    {
-        var auth = new AuthServer(_header, authStorage, authEvents, $rootScope);
+        var auth = new AuthServer(dgAuthServiceProvider.getHeader(), authStorage);
 
         if(authStorage.hasServerAuth())
             auth.setConfig(authStorage.getServerAuth());
 
         return auth;
     }];
-});
+}]);

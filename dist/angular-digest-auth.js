@@ -1,17 +1,24 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.2.1 - 2014-01-19
- * @link https://github.com/mgonto/angular-digest-auth
+ * @version v0.4.0 - 2014-01-27
+ * @link https://github.com/tafax/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
  */
+
+
 'use strict';
+
+
+// Source: src/angular-digest-auth.js
 
 /**
  * dgAuth provides functionality to manage
  * user authentication
  */
-var dgAuth = angular.module('dgAuth', ['angular-md5', 'ngCookies']);
+var dgAuth = angular.module('dgAuth', ['angular-md5', 'FSM']);
+
+// Source: src/config/config-module.js
 
 /**
  * Configures http to intercept requests and responses with error 401.
@@ -19,69 +26,497 @@ var dgAuth = angular.module('dgAuth', ['angular-md5', 'ngCookies']);
 dgAuth.config(['$httpProvider', function($httpProvider)
 {
     $httpProvider.interceptors.push([
-        '$rootScope',
         '$q',
+        'authService',
+        'authClient',
         'authServer',
-        'authEvents',
-    function($rootScope, $q, authServer, authEvents)
-    {
-        return {
-            'request': function(request)
-            {
-                $rootScope.$broadcast(authEvents.getEvent('process.request'), request);
-
-                return (request || $q.when(request));
-            },
-            'responseError': function(rejection)
-            {
-                if(rejection.status === 401)
+        'stateMachine',
+        function($q, authService, authClient, authServer, stateMachine)
+        {
+            return {
+                'request': function(request)
                 {
-                    $rootScope.$broadcast(authEvents.getEvent('process.response'), rejection);
+                    var login = authService.getCredentials();
+                    var header = authClient.processRequest(login.username, login.password, request.method, request.url);
 
-                    
+                    if(header)
+                        request.headers['Authorization'] = header;
 
-                    if(!authServer.parseHeader(rejection))
+                    return (request || $q.when(request));
+                },
+                'responseError': function(rejection)
+                {
+                    if(rejection.status === 401)
                     {
-                        $rootScope.$broadcast(authEvents.getEvent('authentication.notFound'));
-                        return $q.reject(rejection);
+                        if(!authServer.parseHeader(rejection))
+                        {
+                            return $q.reject(rejection);
+                        }
+
+                        var deferred = $q.defer();
+
+                        authService.setRequest(rejection.config, deferred);
+                        stateMachine.send('401', {response: rejection});
+
+                        return deferred.promise;
                     }
 
-                    $rootScope.$broadcast(authEvents.getEvent('authentication.request'));
+                    return $q.reject(rejection);
                 }
-
-                return $q.reject(rejection);
-            }
-        };
-    }]);
+            };
+        }]);
 }]);
 
-/**
- * Uses components to manage authentication.
- */
-dgAuth.run([
-    '$rootScope',
-    'authEvents',
-    'authService',
-    'authClient',
-function($rootScope, authEvents, authService, authClient)
+// Source: src/config/config-state-machine.js
+
+dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
 {
-    $rootScope.$on(authEvents.getEvent('process.request'), function(event, request)
-    {
-        if(authClient.isConfigured())
-        {
-            var login = authService.getCredentials();
-            authClient.processRequest(login.username, login.password, request);
+    stateMachineProvider.config({
+        init: {
+            transitions: {
+                run: 'restoringCredentials'
+            }
+        },
+        restoringCredentials: {
+            transitions: {
+                restored: 'settingCredentials'
+            },
+            //Restores the credentials and propagate
+            action: ['authStorage', 'params', function(authStorage, params)
+            {
+                if(authStorage.hasCredentials())
+                {
+                    params.credentials = {
+                        username: authStorage.getUsername(),
+                        password: authStorage.getPassword()
+                    };
+                }
+
+                return params;
+            }]
+        },
+        settingCredentials: {
+            transitions: {
+                signin: 'loginRequest'
+            },
+            //Sets the credentials as candidate
+            action: ['authService', 'params', function(authService, params)
+            {
+                if(params.hasOwnProperty('credentials'))
+                {
+                    var credentials = params.credentials;
+                    authService.setCredentials(credentials.username, credentials.password);
+                }
+            }]
+        },
+        loginRequest: {
+            transitions: {
+                //Checks if the credentials are present(loginError) or not(waitingCredentials)
+                401: [
+                {
+                    to: 'waitingCredentials',
+                    predicate: ['authService', 'authRequests', function(authService, authRequests)
+                    {
+                        return (!authService.hasCredentials() && authRequests.getValid());
+                    }]
+                },
+                {
+                    to: 'loginError',
+                    predicate: ['authService', 'authRequests', function(authService, authRequests)
+                    {
+                        return (authService.hasCredentials() && authRequests.getValid());
+                    }]
+                },
+                {
+                    to: 'failureLogin',
+                    predicate: ['authRequests', function(authRequests)
+                    {
+                        return !authRequests.getValid();
+                    }]
+                }],
+                201: 'loggedIn'
+            },
+            //Does the request to the server and save the promise
+            action: ['authRequests', function(authRequests)
+            {
+                authRequests.signin();
+            }]
+        },
+        loginError: {
+            transitions: {
+                submitted: 'settingCredentials'
+            },
+            //Delete the credentials that are invalid and notify the error
+            action: ['authService', 'params', function(authService, params)
+            {
+                authService.clearCredentials();
+                var callbacks = authService.getCallbacks('login.error');
+                for(var i in callbacks)
+                {
+                    var callback = callbacks[i];
+                    callback(params.response);
+                }
+            }]
+        },
+        waitingCredentials: {
+            transitions: {
+                submitted: 'settingCredentials'
+            },
+            //Checks the previous state and notify the credential need
+            action: [
+                'authService',
+                'authIdentity',
+                'name',
+                'params',
+            function(authService, authIdentity, name, params)
+            {
+                if(name == 'logoutRequest')
+                {
+                    authIdentity.clear();
+                    authService.clearRequest();
+
+                    var callbacksLogout = authService.getCallbacks('logout.successful');
+                    for(var i in callbacksLogout)
+                    {
+                        var funcSuccessful = callbacksLogout[i];
+                        funcSuccessful(params.response);
+                    }
+                }
+
+                authIdentity.clear();
+                authService.clearCredentials();
+                var callbacksLogin = authService.getCallbacks('login.required');
+                for(var j in callbacksLogin)
+                {
+                    var funcRequest = callbacksLogin[j];
+                    funcRequest(params.response);
+                }
+            }]
+        },
+        loggedIn: {
+            transitions: {
+                signout: 'logoutRequest',
+                401: 'waitingCredentials'
+            },
+            //Checks the previous state and creates the identity and notify the login successful
+            action: [
+                'authService',
+                'authIdentity',
+                'authStorage',
+                'name',
+                'params',
+            function(authService, authIdentity, authStorage, name, params)
+            {
+                if(name == 'logoutRequest')
+                {
+                    var callbacksLogout = authService.getCallbacks('logout.error');
+                    for(var i in callbacksLogout)
+                    {
+                        var funcError = callbacksLogout[i];
+                        funcError(params.response);
+                    }
+                }
+
+                if(name == 'loginRequest')
+                {
+                    authIdentity.set(null, params.response.data);
+                    authService.clearRequest();
+
+                    var credentials = authService.getCredentials();
+                    authStorage.setCredentials(credentials.username, credentials.password);
+
+                    var callbacksLogin = authService.getCallbacks('login.successful');
+                    for(var j in callbacksLogin)
+                    {
+                        var funcSuccessful = callbacksLogin[j];
+                        funcSuccessful(params.response);
+                    }
+                }
+            }]
+        },
+        logoutRequest: {
+            transitions: {
+                401: 'loggedIn',
+                201: 'waitingCredentials'
+            },
+            //Does the request to the server and save the promise
+            action: ['authRequests', function(authRequests)
+            {
+                authRequests.signout();
+            }]
+        },
+        failureLogin: {
+            action: [
+                'authService',
+                'authIdentity',
+                'params',
+            function(authService, authIdentity, params)
+            {
+                authIdentity.clear();
+                authService.clearCredentials();
+
+                var callbacksLogin = authService.getCallbacks('login.limit');
+                for(var j in callbacksLogin)
+                {
+                    var funcLimit = callbacksLogin[j];
+                    funcLimit(params.response);
+                }
+            }]
         }
     });
 }]);
+
+// Source: src/services/dg-auth-service.js
+
+dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
+{
+    /**
+     * Class to provide the API to manage
+     * the module functionality.
+     *
+     * @param {Object} $q
+     * @param {Object} authIdentity
+     * @param {Object} authRequests
+     * @param {StateMachine} stateMachine
+     * @constructor
+     */
+    function DgAuthService($q, authIdentity, authRequests, stateMachine)
+    {
+        /**
+         * Specifies if the service is started.
+         *
+         * @type {boolean}
+         * @private
+         */
+        var _started = false;
+
+        /**
+         * Starts the service.
+         */
+        this.start = function()
+        {
+            stateMachine.initialize();
+
+            stateMachine.send('run');
+            stateMachine.send('restored');
+            stateMachine.send('signin');
+
+            _started = true;
+        };
+
+        /**
+         * Sends a signin message to the state machine.
+         */
+        this.signin = function()
+        {
+            if(!_started)
+                throw 'You have to start te service first';
+
+            stateMachine.send('signin');
+        };
+
+        /**
+         * Sends a signout message to the state machine.
+         */
+        this.signout = function()
+        {
+            if(!_started)
+                throw 'You have to start te service first';
+
+            stateMachine.send('signout');
+        };
+
+        /**
+         * Sends a submitted message to the state machine
+         * with the credentials specified.
+         *
+         * @param {string} username
+         * @param {string} password
+         */
+        this.setCredentials = function(username, password)
+        {
+            if(!_started)
+                throw 'You have to start te service first';
+
+            stateMachine.send('submitted', {
+                credentials: {
+                    username: username,
+                    password: password
+                }
+            });
+        };
+
+        /**
+         * Checks the authentication.
+         *
+         * @returns {promise|false}
+         */
+        this.isAuthorized = function()
+        {
+            var deferred = $q.defer();
+
+            authRequests.getPromise().then(function()
+                {
+                    deferred.resolve(authIdentity.has());
+                },
+                function()
+                {
+                    deferred.reject(authIdentity.has())
+                });
+
+            return deferred.promise;
+        };
+    }
+
+    /**
+     * Default storage for user credentials.
+     *
+     * @type {Storage}
+     * @private
+     */
+    var _storage = window.sessionStorage;
+
+    /**
+     * Sets storage for user credentials.
+     *
+     * @param storage
+     */
+    this.setStorage = function(storage)
+    {
+        _storage = storage;
+    };
+
+    /**
+     * Gets storage for user credentials.
+     *
+     * @returns {Storage}
+     */
+    this.getStorage = function()
+    {
+        return _storage;
+    };
+
+    /**
+     * The configuration for the login and logout.
+     *
+     * @type {Object}
+     * @private
+     */
+    var _config = {
+        login: {
+            method: 'POST',
+            url: '/signin'
+        },
+        logout: {
+            method: 'POST',
+            url: '/signout'
+        }
+    };
+
+    /**
+     * Sets the configuration for the requests.
+     *
+     * @param {Object} config
+     */
+    this.setConfig = function(config)
+    {
+        angular.extend(_config, config);
+    };
+
+    /**
+     * Gets the configuration for the requests.
+     *
+     * @returns {Object}
+     */
+    this.getConfig = function()
+    {
+        return _config;
+    };
+
+    /**
+     *
+     * @type {number|string}
+     * @private
+     */
+    var _limit = 4;
+
+    /**
+     * Sets the limit for the login requests number.
+     *
+     * @param {number|string} limit
+     */
+    this.setLimit = function(limit)
+    {
+        _limit = limit;
+    };
+
+    /**
+     * Gets the limit for the login requests number.
+     *
+     * @returns {number|string}
+     */
+    this.getLimit = function()
+    {
+        return _limit;
+    };
+
+    /**
+     * Callbacks configuration.
+     *
+     * @type {{login: Array, logout: Array}}
+     */
+    this.callbacks = {
+        login: [],
+        logout: []
+    };
+
+    /**
+     * The header string.
+     *
+     * @type {string}
+     */
+    var _header = '';
+
+    /**
+     * Sets the header.
+     *
+     * @param {String} header
+     */
+    this.setHeader = function(header)
+    {
+        _header = header;
+    };
+
+    /**
+     * Gets the header.
+     *
+     * @returns {string}
+     */
+    this.getHeader = function()
+    {
+        return _header;
+    };
+
+    /**
+     * Gets a new instance of the service.
+     *
+     * @type {*[]}
+     */
+    this.$get = ['$q', 'authIdentity', 'authRequests', 'stateMachine', function($q, authIdentity, authRequests, stateMachine)
+    {
+        return new DgAuthService($q, authIdentity, authRequests, stateMachine);
+    }];
+});
+
+// Source: src/services/auth-client.js
+
 /**
  * Manages authentication info in the client scope.
  */
 dgAuth.factory('authClient', [
-    '$rootScope',
     'authServer',
     'md5',
-function($rootScope, authServer, md5)
+function(authServer, md5)
 {
     /**
      * Creates the service to use information generating
@@ -149,12 +584,12 @@ function($rootScope, authServer, md5)
         /**
          * Generate the response.
          *
-         * @param {String} username The username.
-         * @param {String} password The password.
-         * @param {String} method Method used for the request.
-         * @param {String} uri Uri of the resource requested.
-         * @param {String} nc The progressive nc.
-         * @param {String} cnonce The cnonce.
+         * @param {string} username The username.
+         * @param {string} password The password.
+         * @param {string} method Method used for the request.
+         * @param {string} uri Uri of the resource requested.
+         * @param {string} nc The progressive nc.
+         * @param {string} cnonce The cnonce.
          * @returns {string}
          */
         var generateResponse = function(username, password, method, uri, nc, cnonce)
@@ -167,10 +602,10 @@ function($rootScope, authServer, md5)
         /**
          * Aggregates all information to generate header.
          *
-         * @param {String} username The username.
-         * @param {String} password The password.
-         * @param {String} method Method used for the request.
-         * @param {String} uri Uri of the resource requested.
+         * @param {string} username The username.
+         * @param {string} password The password.
+         * @param {string} method Method used for the request.
+         * @param {string} uri Uri of the resource requested.
          * @returns {string}
          */
         var generateHeader = function(username, password, method, uri)
@@ -183,10 +618,10 @@ function($rootScope, authServer, md5)
                 "realm=\"" + authServer.info.realm + "\", " +
                 "nonce=\"" + authServer.info.nonce + "\", " +
                 "uri=\"" + uri + "\", " +
-                "algorithm=" + authServer.algorithm + ", " +
+                "algorithm=\"" + authServer.info.algorithm + "\", " +
                 "response=\"" + generateResponse(username, password, method, uri, nc, cnonce) + "\", " +
                 "opaque=\"" + authServer.info.opaque + "\", " +
-                "qop=" + authServer.info.qop + ", " +
+                "qop=\"" + authServer.info.qop + "\", " +
                 "nc=\"" + nc + "\", " +
                 "cnonce=\"" + cnonce + "\"";
         };
@@ -206,131 +641,117 @@ function($rootScope, authServer, md5)
          * Process a request and add the authorization header
          * if the request need an authentication.
          *
-         * @param {String} username The username.
-         * @param {String} password The password.
-         * @param {Object} request The current request.
+         * @param {string} username The username.
+         * @param {string} password The password.
+         * @param {string} method The method of the request.
+         * @param {string} url The url of the request.
+         * @returns {string|null}
          */
-        this.processRequest = function(username, password, request)
+        this.processRequest = function(username, password, method, url)
         {
-            if(request.url.indexOf(authServer.info.domain) >= 0)
-                request.headers['Authorization'] = generateHeader(username, password, request.method, request.url);
+            var header = null;
+
+            if(this.isConfigured())
+            {
+                if(url.indexOf(authServer.info.domain) >= 0)
+                    header = generateHeader(username, password, method, url);
+            }
+
+            return header;
         };
     }
 
     return new AuthClient();
 }]);
 
-'use strict';
 
-/**
- * Manages the events for the auth module.
- */
-dgAuth.provider('authEvents', function AuthEventsProvider()
+// Source: src/services/auth-identity.js
+
+dgAuth.factory('authIdentity', function()
 {
-    /**
-     * AuthEvents provides a service to get
-     * basic configuration
-     *
-     * @param {Object} events Object to represent all events.
-     * @constructor
-     */
-    function AuthEvents(events)
+    function AuthIdentity()
     {
         /**
-         * The events of module.
          *
-         * @type {Object}
+         * @type {Object|null}
          * @private
          */
-        var _events = events;
+        var _identity = null;
 
         /**
-         * Gets all events.
          *
-         * @returns {Object}
+         * @param {string} [key]
+         * @param {Object|string|Array} value
          */
-        this.getEvents = function()
+        this.set = function(key, value)
         {
-            return _events;
+            if(key)
+            {
+                if(null == _identity)
+                    _identity = {};
+
+                _identity[key] = value;
+            }
+            else
+            {
+                if(value instanceof Object)
+                    _identity = value;
+                else
+                    throw 'You have to provide an object if you want to set the identity without a key.';
+            }
         };
 
         /**
-         * Gets single event by the string provided.
-         * ex: "authentication.header" is the event $events['authentication']['header'].
          *
-         * @param event
-         * @returns {String}
+         *
+         * @param {string} [key]
+         * @returns {Object|Array|string|null}
          */
-        this.getEvent = function(event)
+        this.get = function(key)
         {
-            var split = event.split('.');
+            if(!key)
+                return _identity;
 
-            return _events[split[0]][split[1]];
+            if(!_identity || !_identity.hasOwnProperty(key))
+                return null;
+
+            return _identity[key];
+        };
+
+        /**
+         *
+         * @returns {boolean}
+         */
+        this.has = function()
+        {
+            return (null !== _identity);
+        };
+
+        /**
+         *
+         */
+        this.clear = function()
+        {
+            _identity = null;
         };
     }
 
-    /**
-     * All events in the module.
-     *
-     * @type {{authentication: {header: string}, process: {request: string, response: string}, login: {successful: string, error: string, required: string}, logout: {successful: string, error: string}, credential: {submitted: string, stored: string, restored: string}}}
-     */
-    var _events = {
-        authentication: {
-            headerNotFound: '$authAuthenticationHeaderNotFound',
-            header: '$authAuthenticationHeader',
-            request: '$authAuthenticationRequest'
-        },
-        process: {
-            request: '$authProcessRequest',
-            response: '$authProcessResponse'
-        },
-        login: {
-            successful: '$authSigninSuccessful',
-            error: '$authSigninError',
-            required: '$authSigninRequired'
-        },
-        logout: {
-            successful: '$authSignoutSuccessful',
-            error: '$authSignoutError'
-        },
-        credential: {
-            submitted: '$authCredentialSubmitted',
-            stored: '$authCredentialStored',
-            restored: '$authCredentialRestored'
-        }
-    };
-
-    /**
-     * Sets events by extending basic configuration.
-     *
-     * @param {Object} events
-     */
-    this.setEvents = function(events)
-    {
-        angular.extend(_events, events);
-    };
-
-    /**
-     * Gets AuthEvents service.
-     *
-     * @returns {AuthEventsProvider.AuthEvents}
-     */
-    this.$get = function()
-    {
-        return new AuthEvents(_events);
-    };
+    return new AuthIdentity();
 });
+
+// Source: src/services/auth-server.js
+
 /**
  * Parses and provides server information for the authentication.
  */
-dgAuth.provider('authServer', function AuthServerProvider()
+dgAuth.provider('authServer', ['dgAuthServiceProvider', function AuthServerProvider(dgAuthServiceProvider)
 {
     /**
      * Creates the service for the server info.
      *
      * @constructor
      */
-    function AuthServer(header, authStorage, authEvents, $rootScope)
+    function AuthServer(header, authStorage)
     {
         /**
          * The header string.
@@ -398,64 +819,46 @@ dgAuth.provider('authServer', function AuthServerProvider()
          */
         this.parseHeader = function(response)
         {
-            if(!_configured)
+            var header = response.headers(_header);
+
+            _configured = false;
+
+            if(null !== header)
             {
-                var header = response.headers(_header);
+                var splitting = header.split(', ');
 
-                if(null !== header)
+                for(var i=0; i<splitting.length; i++)
                 {
-                    var splitting = header.split(', ');
-
-                    for(var i=0; i<splitting.length; i++)
-                    {
-                        var values = _valuePattern.exec(splitting[i]);
-                        this.info[values[1]] = values[2];
-                    }
-
-                    authStorage.setServerAuth(this.info);
-                    _configured = true;
-
-                    
-                    $rootScope.$broadcast(authEvents.getEvent('authentication.header'));
+                    var values = _valuePattern.exec(splitting[i]);
+                    this.info[values[1]] = values[2];
                 }
+
+                authStorage.setServerAuth(this.info);
+                _configured = true;
             }
 
             return _configured;
         };
     }
 
-    /**
-     * The header string.
-     *
-     * @type {string}
-     */
-    var _header = '';
-
-    /**
-     * Sets the header.
-     *
-     * @param {String} header
-     */
-    this.setHeader = function(header)
+    this.$get = ['authStorage', function(authStorage)
     {
-        _header = header;
-    };
-
-    this.$get = ['authStorage', 'authEvents', '$rootScope', function(authStorage, authEvents, $rootScope)
-    {
-        var auth = new AuthServer(_header, authStorage, authEvents, $rootScope);
+        var auth = new AuthServer(dgAuthServiceProvider.getHeader(), authStorage);
 
         if(authStorage.hasServerAuth())
             auth.setConfig(authStorage.getServerAuth());
 
         return auth;
     }];
-});
+}]);
+
+
+// Source: src/services/auth-service.js
 
 /**
  * Used to manage the authentication.
  */
-dgAuth.provider('authService', [function AuthServiceProvider()
+dgAuth.provider('authService', ['dgAuthServiceProvider', function AuthServiceProvider(dgAuthServiceProvider)
 {
     /**
      * Creates the authentication service to performs
@@ -464,410 +867,141 @@ dgAuth.provider('authService', [function AuthServiceProvider()
      *
      * @constructor
      */
-    function AuthService(config, $injector, authEvents, authStorage, $rootScope, $http, $q, $cookies, md5)
+    function AuthService(callbacks, $injector)
     {
         /**
-         * The configuration of service.
          *
-         * @type {{login: Object, logout: Object, callbacks: Object, automatic: boolean}}
+         * @type {string}
          * @private
          */
-        var _config = config;
+        var _username = '';
 
         /**
-         * The configuration for the login.
          *
-         * @type {Object}
+         * @type {string}
          * @private
          */
-        var _login = config.login;
+        var _password = '';
 
         /**
-         * The configuration for the logout.
          *
-         * @type {Object}
-         * @private
-         */
-        var _logout = config.logout;
-
-        /**
-         * The configuration of callbacks
-         *
-         * @type {Object}
-         * @private
-         */
-        var _callbacks = config.callbacks;
-
-        /**
-         * The configuration for automatic reconnection.
-         *
-         * @type {boolean}
-         * @private
-         */
-        var _automatic = config.automatic;
-
-        /**
-         * Gets all configurations.
-         *
-         * @returns {{login: Object, logout: Object, callbacks: Object, automatic: boolean}}
-         */
-        this.getConfig = function()
-        {
-            return _config;
-        };
-
-        /**
-         * The current identity
-         *
-         * @type {Object}
-         */
-        var _identity = null;
-
-        /**
-         * Initializes the login object.
-         *
-         * @returns {{username: string, password: string, httpRequest: null, deferred: null, mustTerminate: boolean}}
-         */
-        var initLogin = function ()
-        {
-            return {
-                username: '',
-                password: '',
-                httpRequest: null,
-                deferred: null,
-                mustTerminate: false
-            };
-        };
-
-        /**
-         * Initializes the logout object.
-         *
-         * @returns {{deferred: null, mustTerminate: boolean}}
-         */
-        var initLogout = function()
-        {
-            return {
-                deferred: null,
-                mustTerminate: true
-            }
-        };
-
-        /**
-         * The login object.
-         *
-         * @type {{username: string, password: string, httpRequest: null, deferred: null, mustTerminate: boolean}}
-         */
-        var _loginRequest = initLogin();
-
-        /**
-         * The logout object.
-         *
-         * @type {{deferred: null, mustTerminate: boolean}}
-         */
-        var _logoutRequest = initLogout();
-
-        /**
-         * Sets the http request for login.
-         *
-         * @param {Object} request
-         */
-        this.setHttpRequest = function(request)
-        {
-            angular.extend(_loginRequest, {
-                httpRequest: request
-            });
-        };
-
-        /**
-         * Verifies if the identity is set.
-         *
-         * @returns {boolean}
-         */
-        this.hasIdentity = function()
-        {
-            return (null !== _identity);
-        };
-
-        /**
-         * Gets the identity.
-         *
-         * @returns {Object}
-         */
-        this.getIdentity = function()
-        {
-            return _identity;
-        };
-
-        /**
-         * Sets the credential used for sign in.
-         *
-         * @param {String} username
-         * @param {String} password
+         * @param {string} username
+         * @param {string} password
          */
         this.setCredentials = function(username, password)
         {
-            angular.extend(_loginRequest, {
-                username: username,
-                password: password,
-                mustTerminate: true
-            });
-
-            $rootScope.$broadcast(authEvents.getEvent('credential.submitted'), {
-                username: _loginRequest.username,
-                password: _loginRequest.password
-            });
+            _username = username.trim();
+            _password = password.trim();
         };
 
         /**
-         * Gets the login.
          *
          * @returns {{username: string, password: string}}
          */
         this.getCredentials = function()
         {
             return {
-                username: _loginRequest.username,
-                password: _loginRequest.password
+                username: _username,
+                password: _password
             };
         };
 
-        var performLogin = function()
+        this.hasCredentials = function()
         {
-            
-
-            var deferred = $q.defer();
-
-            $http(_login).then(function(response)
-            {
-                
-
-                _identity = response.data;
-
-                $cookies['_auth'] = md5.createHash('true');
-
-                authStorage.setCredentials(_loginRequest.username, _loginRequest.password);
-
-                $rootScope.$broadcast(authEvents.getEvent('credential.stored'), {
-                    username: _loginRequest.username,
-                    password: _loginRequest.password
-                });
-
-                $rootScope.$broadcast(authEvents.getEvent('login.successful'), response);
-
-                angular.extend(_loginRequest, {
-                    mustTerminate: false
-                });
-
-                deferred.resolve(response.data);
-            },
-            function(response)
-            {
-                if(!_loginRequest.mustTerminate)
-                {
-                    
-
-                    $rootScope.$broadcast(authEvents.getEvent('login.required'));
-
-                    deferred.notify();
-                }
-                else
-                {
-                    
-
-                    $rootScope.$broadcast(authEvents.getEvent('login.error'), response);
-
-                    deferred.reject(response.data);
-                }
-
-                _loginRequest = initLogin();
-            });
-
-            return deferred;
+            return (('' !== _username.trim()) && ('' !== _password.trim()));
         };
 
         /**
-         * Signs in a user.
          *
-         * @returns {promise|*|promise|promise|Function|promise}
          */
-        this.signin = function()
+        this.clearCredentials = function()
         {
-            if($cookies['_auth'] == md5.createHash('true') || _automatic)
-            {
-                if(authStorage.hasCredential())
-                {
-                    angular.extend(_loginRequest, {
-                        username: authStorage.getUsername(),
-                        password: authStorage.getPassword(),
-                        mustTerminate: true
-                    });
-
-                    $rootScope.$broadcast(authEvents.getEvent('credential.restored'), {
-                        username: _loginRequest.username,
-                        password: _loginRequest.password
-                    });
-                }
-            }
-
-            if(!_loginRequest.deferred)
-            {
-                _loginRequest.deferred = performLogin();
-                for(var i in _callbacks.login)
-                {
-                    var callback = $injector.invoke(_callbacks.login[i]);
-                    _loginRequest.deferred.promise.then(callback.successful, callback.error, callback.required);
-                }
-            }
-
-            return _loginRequest.deferred.promise;
-        };
-
-        var performLogout = function()
-        {
-            
-
-            var deferred = $q.defer();
-
-            $http(_logout).then(function(response)
-            {
-                
-
-                $cookies['_auth'] = md5.createHash('false');
-
-                _identity = null;
-                _loginRequest = initLogin();
-
-                $rootScope.$broadcast(authEvents.getEvent('logout.successful'), response);
-
-                deferred.resolve(response.data);
-            },
-            function(response)
-            {
-                
-
-                $rootScope.$broadcast(authEvents.getEvent('logout.error'), response);
-
-                deferred.reject(response.data);
-            });
-
-            return deferred;
+            _username = '';
+            _password = '';
         };
 
         /**
-         * Signs out the current user.
          *
-         * @returns {promise|*|promise|promise|Function|promise}
+         * @type {Object}
+         * @private
          */
-        this.signout = function()
-        {
-            if(!_logoutRequest.deferred)
-            {
-                _logoutRequest.deferred = performLogout();
-                for(var i in _callbacks.logout)
-                {
-                    var callbacks = $injector.invoke(_callbacks.logout[i]);
-                    _logoutRequest.deferred.promise.then(callbacks.successful, callbacks.error);
-                }
-            }
+        var _request = null;
 
-            return _logoutRequest.deferred.promise;
+        /**
+         *
+         * @param {Object} config
+         * @param {Object} deferred
+         */
+        this.setRequest = function(config, deferred)
+        {
+            _request = {
+                config: config,
+                deferred: deferred
+            };
         };
 
         /**
-         * Checks the authentication.
          *
-         * @returns {promise|*}
+         * @returns {Object}
          */
-        this.isAuthenticated = function()
+        this.getRequest = function()
         {
-            var deferred = $q.defer();
+            return _request;
+        };
 
-            if(_logoutRequest.deferred)
+        /**
+         *
+         * @returns {boolean}
+         */
+        this.hasRequest = function()
+        {
+            return (null !== _request);
+        };
+
+        /**
+         *
+         */
+        this.clearRequest = function()
+        {
+            _request = null;
+        };
+
+        /**
+         *
+         * @param {string} callback
+         * @returns {Array}
+         */
+        this.getCallbacks = function(callback)
+        {
+            var split = callback.split('.');
+            if(split.length > 2 || split.length == 0)
+                throw 'The type for the callbacks is invalid.';
+
+            var family = split[0];
+            var type = (split.length == 2) ? split[1] : null;
+
+            var result = [];
+
+            if(callbacks.hasOwnProperty(family))
             {
-                _logoutRequest.deferred.promise.then(function(response)
+                var typedCallbacks = callbacks[family];
+                for(var i in typedCallbacks)
+                {
+                    var func = $injector.invoke(typedCallbacks[i]);
+
+                    if(type)
                     {
-                        deferred.reject(response.data);
-                    },
-                    function()
-                    {
-                        deferred.resolve(($cookies['_auth'] == md5.createHash('true') && null !== _identity))
-                    });
-            }
-            else if(_loginRequest.deferred)
-            {
-                _loginRequest.deferred.promise.then(function()
-                    {
-                        deferred.resolve(($cookies['_auth'] == md5.createHash('true') && null !== _identity));
-                    },
-                    function(response)
-                    {
-                        deferred.reject(response.data);
-                    });
+                        if(func.hasOwnProperty(type))
+                            result.push(func[type]);
+                    }
+                    else
+                        result.push(func);
+                }
             }
 
-            return deferred.promise;
+            return result;
         };
     }
-
-    /**
-     * Callbacks configuration.
-     *
-     * @type {{login: Array, logout: Array}}
-     */
-    this.callbacks = {
-        login: [],
-        logout: []
-    };
-
-    /**
-     * The configuration for automatic reconnection.
-     *
-     * @type {boolean}
-     * @private
-     */
-    var _automatic = false;
-
-    /**
-     * Sets configuration for automatic reconnection.
-     *
-     * @param {boolean} automatic
-     */
-    this.setAutomatic = function(automatic)
-    {
-        _automatic = automatic;
-    };
-
-    /**
-     * Gets configuration for automatic reconnection.
-     *
-     * @returns {boolean}
-     */
-    this.getAutomatic = function()
-    {
-        return _automatic;
-    };
-
-    /**
-     * The configuration for the login and logout.
-     *
-     * @type {{login: {method: string, url: string}, logout: {method: string, url: string}}}
-     * @private
-     */
-    var _config = {
-        login: {
-            method: 'POST',
-            url: '/signin'
-        },
-        logout: {
-            method: 'POST',
-            url: '/signout'
-        }
-    };
-
-    this.setConfig = function(config)
-    {
-        angular.extend(_config, config);
-    };
 
     /**
      * Gets a new instance of AuthService.
@@ -876,42 +1010,153 @@ dgAuth.provider('authService', [function AuthServiceProvider()
      */
     this.$get = [
         '$injector',
-        'authEvents',
-        'authStorage',
-        '$rootScope',
-        '$http',
-        '$q',
-        '$cookies',
-        'md5',
     /**
      * Gets a new instance of AuthService.
      *
      * @param {Object} $injector
-     * @param {AuthEvents} authEvents
-     * @param {AuthStorage} authStorage
-     * @param {Object} $rootScope
-     * @param {Object} $http
-     * @param {Object} $q
-     * @param {Object} $cookies
-     * @param {Object} md5
      * @returns {AuthService}
      */
-    function($injector, authEvents, authStorage, $rootScope, $http, $q, $cookies, md5)
+    function($injector)
     {
-        return new AuthService({
-            login: _config.login,
-            logout: _config.logout,
-            callbacks: this.callbacks,
-            automatic: _automatic
-        }, $injector, authEvents, authStorage, $rootScope, $http, $q, $cookies, md5);
+        return new AuthService(dgAuthServiceProvider.callbacks, $injector);
     }];
 
 }]);
+
+// Source: src/services/auth-requests.js
+
+dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsProvider(dgAuthServiceProvider)
+{
+    function AuthRequest(limit, config, $http, authService, stateMachine)
+    {
+        /**
+         *
+         *
+         * @type {promise|null}
+         * @private
+         */
+        var _promise = null;
+
+        /**
+         *
+         *
+         * @returns {promise|null}
+         */
+        this.getPromise = function()
+        {
+            return _promise;
+        };
+
+        /**
+         *
+         * @type {number}
+         * @private
+         */
+        var _times = 0;
+
+        /**
+         *
+         * @returns {boolean}
+         */
+        this.getValid = function()
+        {
+            if('inf' == limit)
+                return true;
+
+            return (_times <= limit);
+        };
+
+        var request = function()
+        {
+            var promise = null;
+
+            if(authService.hasRequest())
+            {
+                var request = authService.getRequest();
+                promise = $http(request.config).then(function(response)
+                    {
+                        request.deferred.resolve(response);
+
+                        return response;
+                    },
+                    function(response)
+                    {
+                        request.deferred.reject(response);
+
+                        return response;
+                    });
+            }
+
+            return promise;
+        };
+
+        /**
+         *
+         * @returns {promise}
+         */
+        this.signin = function()
+        {
+            _times++;
+
+            _promise = request();
+            if(_promise)
+                return _promise;
+
+            _promise = $http(config.login).then(function(response)
+                {
+                    _times = 0;
+                    stateMachine.send('201', {response: response});
+
+                    return response;
+                },
+                function(response)
+                {
+                    _times = 0;
+                    stateMachine.send('failure', {response: response});
+
+                    return response;
+                });
+
+            return _promise;
+        };
+
+        /**
+         *
+         * @returns {promise}
+         */
+        this.signout = function()
+        {
+            _promise = request();
+            if(_promise)
+                return _promise;
+
+            _promise = $http(config.logout).then(function(response)
+                {
+                    stateMachine.send('201', {response: response});
+
+                    return response;
+                },
+                function(response)
+                {
+                    return response;
+                });
+            return _promise;
+        };
+    }
+
+    this.$get = ['$http', 'authService', 'stateMachine', function($http, authService, stateMachine)
+    {
+        return new AuthRequest(dgAuthServiceProvider.getLimit(), dgAuthServiceProvider.getConfig(), $http, authService, stateMachine);
+    }];
+}]);
+
+// Source: src/services/auth-storage.js
+
 /**
  * Stores information to remember user credentials
  * and server information.
  */
-dgAuth.provider('authStorage', function AuthStorageProvider()
+dgAuth.provider('authStorage', ['dgAuthServiceProvider', function AuthStorageProvider(dgAuthServiceProvider)
 {
     /**
      * Creates the service for the storage.
@@ -934,16 +1179,24 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
         var _storage = storage;
 
         /**
+         * The session storage.
+         *
+         * @type {Storage}
+         * @private
+         */
+        var _sessionStorage = window.sessionStorage;
+
+        /**
          * Checks if the storage has some credentials.
          *
          * @returns {boolean}
          */
-        this.hasCredential = function()
+        this.hasCredentials = function()
         {
             var username = _storage.getItem('username');
             var password = _storage.getItem('password');
 
-            return ((null !== username && null !== password));
+            return ((null !== username && null !== password) && (undefined !== username && undefined !== password));
         };
 
         /**
@@ -965,7 +1218,8 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
          */
         this.hasServerAuth = function()
         {
-            return (null !== sessionStorage.getItem('server'));
+            var value = _sessionStorage.getItem('server');
+            return (null !== value && undefined !== value);
         };
 
         /**
@@ -975,7 +1229,7 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
          */
         this.setServerAuth = function(server)
         {
-            sessionStorage.setItem('server', JSON.stringify(server));
+            _sessionStorage.setItem('server', angular.toJson(server));
         };
 
         /**
@@ -985,7 +1239,7 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
          */
         this.getServerAuth = function()
         {
-            return JSON.parse(sessionStorage.getItem('server'));
+            return angular.fromJson(_sessionStorage.getItem('server'));
         };
 
         /**
@@ -1014,27 +1268,9 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
         this.clear = function()
         {
             _storage.clear();
-            sessionStorage.clear();
+            _sessionStorage.clear();
         };
     }
-
-    /**
-     * Default storage for user credential.
-     *
-     * @type {Storage}
-     * @private
-     */
-    var _storage = sessionStorage;
-
-    /**
-     * Sets storage for user credential.
-     *
-     * @param storage
-     */
-    this.setStorage = function(storage)
-    {
-        _storage = storage;
-    };
 
     /**
      * Gets a new instance of AuthStorage.
@@ -1043,6 +1279,6 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
      */
     this.$get = function()
     {
-        return new AuthStorage(_storage);
+        return new AuthStorage(dgAuthServiceProvider.getStorage());
     };
-});
+}]);

@@ -46,10 +46,26 @@ module.exports = function(grunt)
         },
         concat: {
             options: {
-                banner: '<%= meta.banner %>'
+                banner: '<%= meta.banner %>\n\n\'use strict\';\n\n',
+                process: function(src, filepath) {
+                    return '\n// Source: ' + filepath + '\n\n' +
+                        src.replace(/(^|\n)[ \t]*('use strict'|"use strict");?\s*/g, '$1');
+                }
             },
             dist: {
-                src: ['<%= dirs.src %>/**/*.js'],
+                src: [
+                    'src/angular-digest-auth.js',
+                    'src/config/config-module.js',
+                    'src/config/config-state-machine.js',
+                    'src/services/dg-auth-service.js',
+                    'src/services/auth-client.js',
+                    'src/services/auth-events.js',
+                    'src/services/auth-identity.js',
+                    'src/services/auth-server.js',
+                    'src/services/auth-service.js',
+                    'src/services/auth-requests.js',
+                    'src/services/auth-storage.js'
+                ],
                 dest: '<%= dirs.dest %>/<%= pkg.name %>.dev.js'
             }
         },
@@ -129,4 +145,7 @@ module.exports = function(grunt)
 
     // Build task.
     grunt.registerTask('build', ['test', 'concat', 'removelogging', 'uglify']);
+
+    // Version task.
+    grunt.registerTask('version', ['bump', 'build']);
 };

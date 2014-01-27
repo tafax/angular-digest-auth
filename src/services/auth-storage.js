@@ -2,7 +2,7 @@
  * Stores information to remember user credentials
  * and server information.
  */
-dgAuth.provider('authStorage', function AuthStorageProvider()
+dgAuth.provider('authStorage', ['dgAuthServiceProvider', function AuthStorageProvider(dgAuthServiceProvider)
 {
     /**
      * Creates the service for the storage.
@@ -25,16 +25,24 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
         var _storage = storage;
 
         /**
+         * The session storage.
+         *
+         * @type {Storage}
+         * @private
+         */
+        var _sessionStorage = window.sessionStorage;
+
+        /**
          * Checks if the storage has some credentials.
          *
          * @returns {boolean}
          */
-        this.hasCredential = function()
+        this.hasCredentials = function()
         {
             var username = _storage.getItem('username');
             var password = _storage.getItem('password');
 
-            return ((null !== username && null !== password));
+            return ((null !== username && null !== password) && (undefined !== username && undefined !== password));
         };
 
         /**
@@ -56,7 +64,8 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
          */
         this.hasServerAuth = function()
         {
-            return (null !== sessionStorage.getItem('server'));
+            var value = _sessionStorage.getItem('server');
+            return (null !== value && undefined !== value);
         };
 
         /**
@@ -66,7 +75,7 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
          */
         this.setServerAuth = function(server)
         {
-            sessionStorage.setItem('server', JSON.stringify(server));
+            _sessionStorage.setItem('server', angular.toJson(server));
         };
 
         /**
@@ -76,7 +85,7 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
          */
         this.getServerAuth = function()
         {
-            return JSON.parse(sessionStorage.getItem('server'));
+            return angular.fromJson(_sessionStorage.getItem('server'));
         };
 
         /**
@@ -105,27 +114,9 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
         this.clear = function()
         {
             _storage.clear();
-            sessionStorage.clear();
+            _sessionStorage.clear();
         };
     }
-
-    /**
-     * Default storage for user credential.
-     *
-     * @type {Storage}
-     * @private
-     */
-    var _storage = sessionStorage;
-
-    /**
-     * Sets storage for user credential.
-     *
-     * @param storage
-     */
-    this.setStorage = function(storage)
-    {
-        _storage = storage;
-    };
 
     /**
      * Gets a new instance of AuthStorage.
@@ -134,6 +125,6 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
      */
     this.$get = function()
     {
-        return new AuthStorage(_storage);
+        return new AuthStorage(dgAuthServiceProvider.getStorage());
     };
-});
+}]);

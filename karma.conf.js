@@ -15,16 +15,21 @@ module.exports = function(config) {
     // list of files / patterns to load in the browser
     files: [
       'lib/angular/angular.min.js',
-      'lib/angular-cookies/angular-cookies.min.js',
       'lib/angular-mocks/angular-mocks.js',
       'lib/angular-md5/angular-md5.js',
+      'lib/angular-state-machine/src/angular-state-machine.js',
+      'lib/angular-state-machine/src/services/state-machine.js',
       'src/angular-digest-auth.js',
+      'src/config/config-module.js',
+      'src/config/config-state-machine.js',
+      'src/services/dg-auth-service.js',
       'src/services/auth-client.js',
-      'src/services/auth-events.js',
+      'src/services/auth-identity.js',
       'src/services/auth-server.js',
       'src/services/auth-service.js',
+      'src/services/auth-requests.js',
       'src/services/auth-storage.js',
-      'tests/**/*.js'
+      'tests/**/*Spec.js'
     ],
 
 
@@ -64,7 +69,7 @@ module.exports = function(config) {
     // - Safari (only Mac; has to be installed with `npm install karma-safari-launcher`)
     // - PhantomJS
     // - IE (only Windows; has to be installed with `npm install karma-ie-launcher`)
-    browsers: ['Chrome', 'Firefox'],
+    browsers: ['Chrome', 'Firefox', 'Opera'],
 
 
     // If browser does not capture in given timeout [ms], kill it

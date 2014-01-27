@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.3.0 - 2014-01-27
+ * @version v0.4.0 - 2014-01-27
  * @link https://github.com/tafax/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -26,13 +26,12 @@ var dgAuth = angular.module('dgAuth', ['angular-md5', 'FSM']);
 dgAuth.config(['$httpProvider', function($httpProvider)
 {
     $httpProvider.interceptors.push([
-        '$rootScope',
         '$q',
         'authService',
         'authClient',
         'authServer',
         'stateMachine',
-        function($rootScope, $q, authService, authClient, authServer, stateMachine)
+        function($q, authService, authClient, authServer, stateMachine)
         {
             return {
                 'request': function(request)
@@ -275,10 +274,13 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
      * Class to provide the API to manage
      * the module functionality.
      *
+     * @param {Object} $q
+     * @param {Object} authIdentity
+     * @param {Object} authRequests
      * @param {StateMachine} stateMachine
      * @constructor
      */
-    function DgAuthService(stateMachine)
+    function DgAuthService($q, authIdentity, authRequests, stateMachine)
     {
         /**
          * Specifies if the service is started.
@@ -342,6 +344,27 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
                     password: password
                 }
             });
+        };
+
+        /**
+         * Checks the authentication.
+         *
+         * @returns {promise|false}
+         */
+        this.isAuthorized = function()
+        {
+            var deferred = $q.defer();
+
+            authRequests.getPromise().then(function()
+                {
+                    deferred.resolve(authIdentity.has());
+                },
+                function()
+                {
+                    deferred.reject(authIdentity.has())
+                });
+
+            return deferred.promise;
         };
     }
 
@@ -479,9 +502,9 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
      *
      * @type {*[]}
      */
-    this.$get = ['stateMachine', function(stateMachine)
+    this.$get = ['$q', 'authIdentity', 'authRequests', 'stateMachine', function($q, authIdentity, authRequests, stateMachine)
     {
-        return new DgAuthService(stateMachine);
+        return new DgAuthService($q, authIdentity, authRequests, stateMachine);
     }];
 });
 
@@ -491,10 +514,9 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
  * Manages authentication info in the client scope.
  */
 dgAuth.factory('authClient', [
-    '$rootScope',
     'authServer',
     'md5',
-function($rootScope, authServer, md5)
+function(authServer, md5)
 {
     /**
      * Creates the service to use information generating
@@ -643,110 +665,9 @@ function($rootScope, authServer, md5)
 }]);
 
 
-// Source: src/services/auth-events.js
-
-/**
- * Manages the events for the auth module.
- */
-dgAuth.provider('authEvents', function AuthEventsProvider()
-{
-    /**
-     * AuthEvents provides a service to get
-     * basic configuration
-     *
-     * @param {Object} events Object to represent all events.
-     * @constructor
-     */
-    function AuthEvents(events)
-    {
-        /**
-         * The events of module.
-         *
-         * @type {Object}
-         * @private
-         */
-        var _events = events;
-
-        /**
-         * Gets all events.
-         *
-         * @returns {Object}
-         */
-        this.getEvents = function()
-        {
-            return _events;
-        };
-
-        /**
-         * Gets single event by the string provided.
-         * ex: "authentication.header" is the event $events['authentication']['header'].
-         *
-         * @param event
-         * @returns {String}
-         */
-        this.getEvent = function(event)
-        {
-            var split = event.split('.');
-
-            return _events[split[0]][split[1]];
-        };
-    }
-
-    /**
-     * All events in the module.
-     *
-     * @type {{authentication: {header: string}, process: {request: string, response: string}, login: {successful: string, error: string, required: string}, logout: {successful: string, error: string}, credential: {submitted: string, stored: string, restored: string}}}
-     */
-    var _events = {
-        authentication: {
-            headerNotFound: '$authAuthenticationHeaderNotFound',
-            header: '$authAuthenticationHeader',
-            request: '$authAuthenticationRequest'
-        },
-        process: {
-            request: '$authProcessRequest',
-            response: '$authProcessResponse'
-        },
-        login: {
-            successful: '$authSigninSuccessful',
-            error: '$authSigninError',
-            required: '$authSigninRequired'
-        },
-        logout: {
-            successful: '$authSignoutSuccessful',
-            error: '$authSignoutError'
-        },
-        credential: {
-            submitted: '$authCredentialSubmitted',
-            stored: '$authCredentialStored',
-            restored: '$authCredentialRestored'
-        }
-    };
-
-    /**
-     * Sets events by extending basic configuration.
-     *
-     * @param {Object} events
-     */
-    this.setEvents = function(events)
-    {
-        angular.extend(_events, events);
-    };
-
-    /**
-     * Gets AuthEvents service.
-     *
-     * @returns {AuthEventsProvider.AuthEvents}
-     */
-    this.$get = function()
-    {
-        return new AuthEvents(_events);
-    };
-});
-
 // Source: src/services/auth-identity.js
 
-dgAuth.factory('authIdentity', ['$q', 'authRequests', function($q, authRequests)
+dgAuth.factory('authIdentity', function()
 {
     function AuthIdentity()
     {
@@ -813,31 +734,10 @@ dgAuth.factory('authIdentity', ['$q', 'authRequests', function($q, authRequests)
         {
             _identity = null;
         };
-
-        /**
-         * Checks the authentication.
-         *
-         * @returns {promise|false}
-         */
-        this.isAuthorized = function()
-        {
-            var deferred = $q.defer();
-
-            authRequests.getPromise().then(function()
-                {
-                    deferred.resolve((null !== _identity));
-                },
-                function()
-                {
-                    deferred.reject((null !== _identity))
-                });
-
-            return deferred.promise;
-        };
     }
 
     return new AuthIdentity();
-}]);
+});
 
 // Source: src/services/auth-server.js
 
@@ -851,7 +751,7 @@ dgAuth.provider('authServer', ['dgAuthServiceProvider', function AuthServerProvi
      *
      * @constructor
      */
-    function AuthServer(header, authStorage, authEvents, $rootScope)
+    function AuthServer(header, authStorage)
     {
         /**
          * The header string.
@@ -941,9 +841,9 @@ dgAuth.provider('authServer', ['dgAuthServiceProvider', function AuthServerProvi
         };
     }
 
-    this.$get = ['authStorage', 'authEvents', '$rootScope', function(authStorage, authEvents, $rootScope)
+    this.$get = ['authStorage', function(authStorage)
     {
-        var auth = new AuthServer(dgAuthServiceProvider.getHeader(), authStorage, authEvents, $rootScope);
+        var auth = new AuthServer(dgAuthServiceProvider.getHeader(), authStorage);
 
         if(authStorage.hasServerAuth())
             auth.setConfig(authStorage.getServerAuth());
@@ -1110,11 +1010,6 @@ dgAuth.provider('authService', ['dgAuthServiceProvider', function AuthServicePro
      */
     this.$get = [
         '$injector',
-        'stateMachine',
-        'authEvents',
-        'authStorage',
-        '$rootScope',
-        '$q',
     /**
      * Gets a new instance of AuthService.
      *

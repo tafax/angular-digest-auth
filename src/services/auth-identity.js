@@ -1,4 +1,4 @@
-dgAuth.factory('authIdentity', ['$q', 'authRequests', function($q, authRequests)
+dgAuth.factory('authIdentity', function()
 {
     function AuthIdentity()
     {
@@ -65,28 +65,7 @@ dgAuth.factory('authIdentity', ['$q', 'authRequests', function($q, authRequests)
         {
             _identity = null;
         };
-
-        /**
-         * Checks the authentication.
-         *
-         * @returns {promise|false}
-         */
-        this.isAuthorized = function()
-        {
-            var deferred = $q.defer();
-
-            authRequests.getPromise().then(function()
-                {
-                    deferred.resolve((null !== _identity));
-                },
-                function()
-                {
-                    deferred.reject((null !== _identity))
-                });
-
-            return deferred.promise;
-        };
     }
 
     return new AuthIdentity();
-}]);
+});

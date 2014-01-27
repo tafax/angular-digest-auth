@@ -8,7 +8,7 @@ dgAuth.provider('authServer', ['dgAuthServiceProvider', function AuthServerProvi
      *
      * @constructor
      */
-    function AuthServer(header, authStorage, authEvents, $rootScope)
+    function AuthServer(header, authStorage)
     {
         /**
          * The header string.
@@ -98,9 +98,9 @@ dgAuth.provider('authServer', ['dgAuthServiceProvider', function AuthServerProvi
         };
     }
 
-    this.$get = ['authStorage', 'authEvents', '$rootScope', function(authStorage, authEvents, $rootScope)
+    this.$get = ['authStorage', function(authStorage)
     {
-        var auth = new AuthServer(dgAuthServiceProvider.getHeader(), authStorage, authEvents, $rootScope);
+        var auth = new AuthServer(dgAuthServiceProvider.getHeader(), authStorage);
 
         if(authStorage.hasServerAuth())
             auth.setConfig(authStorage.getServerAuth());

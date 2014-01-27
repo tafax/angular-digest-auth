@@ -6,10 +6,13 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
      * Class to provide the API to manage
      * the module functionality.
      *
+     * @param {Object} $q
+     * @param {Object} authIdentity
+     * @param {Object} authRequests
      * @param {StateMachine} stateMachine
      * @constructor
      */
-    function DgAuthService(stateMachine)
+    function DgAuthService($q, authIdentity, authRequests, stateMachine)
     {
         /**
          * Specifies if the service is started.
@@ -73,6 +76,27 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
                     password: password
                 }
             });
+        };
+
+        /**
+         * Checks the authentication.
+         *
+         * @returns {promise|false}
+         */
+        this.isAuthorized = function()
+        {
+            var deferred = $q.defer();
+
+            authRequests.getPromise().then(function()
+                {
+                    deferred.resolve(authIdentity.has());
+                },
+                function()
+                {
+                    deferred.reject(authIdentity.has())
+                });
+
+            return deferred.promise;
         };
     }
 
@@ -210,8 +234,8 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
      *
      * @type {*[]}
      */
-    this.$get = ['stateMachine', function(stateMachine)
+    this.$get = ['$q', 'authIdentity', 'authRequests', 'stateMachine', function($q, authIdentity, authRequests, stateMachine)
     {
-        return new DgAuthService(stateMachine);
+        return new DgAuthService($q, authIdentity, authRequests, stateMachine);
     }];
 });

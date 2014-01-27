@@ -145,4 +145,7 @@ module.exports = function(grunt)
 
     // Build task.
     grunt.registerTask('build', ['test', 'concat', 'removelogging', 'uglify']);
+
+    // Version task.
+    grunt.registerTask('version', ['bump', 'build']);
 };

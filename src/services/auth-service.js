@@ -153,11 +153,6 @@ dgAuth.provider('authService', ['dgAuthServiceProvider', function AuthServicePro
      */
     this.$get = [
         '$injector',
-        'stateMachine',
-        'authEvents',
-        'authStorage',
-        '$rootScope',
-        '$q',
     /**
      * Gets a new instance of AuthService.
      *

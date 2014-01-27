@@ -24,7 +24,6 @@ module.exports = function(config) {
       'src/config/config-state-machine.js',
       'src/services/dg-auth-service.js',
       'src/services/auth-client.js',
-      'src/services/auth-events.js',
       'src/services/auth-identity.js',
       'src/services/auth-server.js',
       'src/services/auth-service.js',

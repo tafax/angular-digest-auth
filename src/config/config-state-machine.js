@@ -43,7 +43,8 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
         loginRequest: {
             transitions: {
                 //Checks if the credentials are present(loginError) or not(waitingCredentials)
-                401: [{
+                401: [
+                {
                     to: 'waitingCredentials',
                     predicate: ['authService', 'authRequests', function(authService, authRequests)
                     {
@@ -93,11 +94,18 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                 submitted: 'settingCredentials'
             },
             //Checks the previous state and notify the credential need
-            action: ['authService', 'authIdentity', 'name', 'params', function(authService, authIdentity, name, params)
+            action: [
+                'authService',
+                'authIdentity',
+                'name',
+                'params',
+            function(authService, authIdentity, name, params)
             {
                 if(name == 'logoutRequest')
                 {
                     authIdentity.clear();
+                    authService.clearRequest();
+
                     var callbacksLogout = authService.getCallbacks('logout.successful');
                     for(var i in callbacksLogout)
                     {
@@ -122,7 +130,13 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                 401: 'waitingCredentials'
             },
             //Checks the previous state and creates the identity and notify the login successful
-            action: ['authService', 'authIdentity', 'name', 'params', function(authService, authIdentity, name, params)
+            action: [
+                'authService',
+                'authIdentity',
+                'authStorage',
+                'name',
+                'params',
+            function(authService, authIdentity, authStorage, name, params)
             {
                 if(name == 'logoutRequest')
                 {
@@ -137,6 +151,10 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                 if(name == 'loginRequest')
                 {
                     authIdentity.set(null, params.response.data);
+                    authService.clearRequest();
+
+                    var credentials = authService.getCredentials();
+                    authStorage.setCredentials(credentials.username, credentials.password);
 
                     var callbacksLogin = authService.getCallbacks('login.successful');
                     for(var j in callbacksLogin)
@@ -159,10 +177,15 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
             }]
         },
         failureLogin: {
-            action: ['authService', 'authIdentity', 'params', function(authService, authIdentity, params)
+            action: [
+                'authService',
+                'authIdentity',
+                'params',
+            function(authService, authIdentity, params)
             {
                 authIdentity.clear();
                 authService.clearCredentials();
+
                 var callbacksLogin = authService.getCallbacks('login.limit');
                 for(var j in callbacksLogin)
                 {

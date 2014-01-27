@@ -1,3 +1,5 @@
+'use strict';
+
 describe('Authentication Identity Specification', function()
 {
     var _authIdentity;

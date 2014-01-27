@@ -2,7 +2,7 @@
  * Stores information to remember user credentials
  * and server information.
  */
-dgAuth.provider('authStorage', function AuthStorageProvider()
+dgAuth.provider('authStorage', ['dgAuthServiceProvider', function AuthStorageProvider(dgAuthServiceProvider)
 {
     /**
      * Creates the service for the storage.
@@ -119,30 +119,12 @@ dgAuth.provider('authStorage', function AuthStorageProvider()
     }
 
     /**
-     * Default storage for user credential.
-     *
-     * @type {Storage}
-     * @private
-     */
-    var _storage = window.sessionStorage;
-
-    /**
-     * Sets storage for user credential.
-     *
-     * @param storage
-     */
-    this.setStorage = function(storage)
-    {
-        _storage = storage;
-    };
-
-    /**
      * Gets a new instance of AuthStorage.
      *
      * @returns {AuthStorageProvider.AuthStorage}
      */
     this.$get = function()
     {
-        return new AuthStorage(_storage);
+        return new AuthStorage(dgAuthServiceProvider.getStorage());
     };
-});
+}]);

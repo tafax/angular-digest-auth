@@ -1,4 +1,4 @@
-dgAuth.provider('authRequests', function AuthRequestsProvider()
+dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsProvider(dgAuthServiceProvider)
 {
     function AuthRequest(limit, config, $http, authService, stateMachine)
     {
@@ -117,51 +117,8 @@ dgAuth.provider('authRequests', function AuthRequestsProvider()
         };
     }
 
-    /**
-     * The configuration for the login and logout.
-     *
-     * @type {Object}
-     * @private
-     */
-    var _config = {
-        login: {
-            method: 'POST',
-            url: '/signin'
-        },
-        logout: {
-            method: 'POST',
-            url: '/signout'
-        }
-    };
-
-    /**
-     * Sets the configuration for the requests.
-     *
-     * @param {Object} config
-     */
-    this.setConfig = function(config)
-    {
-        angular.extend(_config, config);
-    };
-
-    /**
-     *
-     * @type {number|string}
-     * @private
-     */
-    var _limit = 4;
-
-    /**
-     *
-     * @param {number|string} limit
-     */
-    this.setLimit = function(limit)
-    {
-        _limit = limit;
-    };
-
     this.$get = ['$http', 'authService', 'stateMachine', function($http, authService, stateMachine)
     {
-        return new AuthRequest(_limit, _config, $http, authService, stateMachine);
+        return new AuthRequest(dgAuthServiceProvider.getLimit(), dgAuthServiceProvider.getConfig(), $http, authService, stateMachine);
     }];
-});
+}]);

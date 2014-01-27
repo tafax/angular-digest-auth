@@ -1,3 +1,5 @@
+'use strict';
+
 describe('Authentication Client Specification', function()
 {
     var createResponse = function(username, password, method, uri, nc, cnonce)

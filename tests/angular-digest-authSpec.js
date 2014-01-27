@@ -1,5 +1,5 @@
 'use strict';
-//TODO: tests for the limited and unlimited login requests
+
 describe('angular-digest-auth', function()
 {
     var _stateMachine;
@@ -34,14 +34,12 @@ describe('angular-digest-auth', function()
     {
         var fakeModule = angular.module('test.config', []);
         fakeModule.config([
-            'authRequestsProvider',
-            'authServiceProvider',
-            'authServerProvider',
-        function(authRequestsProvider, authServiceProvider, authServerProvider)
+            'dgAuthServiceProvider',
+        function(dgAuthServiceProvider)
         {
-            authRequestsProvider.setLimit(10);
+            dgAuthServiceProvider.setLimit(10);
 
-            authRequestsProvider.setConfig({
+            dgAuthServiceProvider.setConfig({
                 login: {
                     method: 'POST',
                     url: '/signin'
@@ -52,7 +50,7 @@ describe('angular-digest-auth', function()
                 }
             });
 
-            authServiceProvider.callbacks.login.push(['authIdentity', function(authIdentity)
+            dgAuthServiceProvider.callbacks.login.push(['authIdentity', function(authIdentity)
             {
                 return {
                     successful: function(response)
@@ -81,7 +79,7 @@ describe('angular-digest-auth', function()
                 };
             }]);
 
-            authServiceProvider.callbacks.logout.push(['authIdentity', function(authIdentity)
+            dgAuthServiceProvider.callbacks.logout.push(['authIdentity', function(authIdentity)
             {
                 return {
                     successful: function(response)
@@ -99,7 +97,7 @@ describe('angular-digest-auth', function()
                 };
             }]);
 
-            authServerProvider.setHeader('X-Auth-Digest');
+            dgAuthServiceProvider.setHeader('X-Auth-Digest');
         }]);
 
         module('dgAuth', 'test.config');
@@ -408,6 +406,71 @@ describe('angular-digest-auth', function()
                 expect(value).toBeTruthy();
             });
         });
+
+        it('should have multiple errors and logout successful', function()
+        {
+            for(var i=0; i<8; i++)
+            {
+                _stateMachine.send('submitted', {
+                    credentials: {
+                        username: 'fake',
+                        password: 'fake'
+                    }
+                });
+
+                expect(_authService.setCredentials).toHaveBeenCalledWith('fake', 'fake');
+
+                _stateMachine.send('signin');
+
+                _httpBackend.expectPOST('/signin');
+                _httpBackend.flush(1);
+
+                expect(_authService.clearCredentials).toHaveBeenCalled();
+                expect(_authService.getCallbacks).toHaveBeenCalledWith('login.error');
+            }
+
+            _stateMachine.send('submitted', {
+                credentials: {
+                    username: 'test',
+                    password: 'test'
+                }
+            });
+
+            expect(_authService.setCredentials).toHaveBeenCalledWith('test', 'test');
+
+            spyOn(_authIdentity, 'set').andCallThrough();
+
+            _stateMachine.send('signin');
+
+            _httpBackend.expectPOST('/signin');
+            _httpBackend.flush(1);
+
+            expect(_authIdentity.set).toHaveBeenCalled();
+            expect(_authService.getCallbacks).toHaveBeenCalled();
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeTruthy();
+            });
+
+            _stateMachine.send('signout');
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeFalsy();
+            });
+
+            _httpBackend.expectPOST('/signout');
+            _httpBackend.flush(1);
+
+            expect(_authIdentity.clear).toHaveBeenCalled();
+            expect(_authService.getCallbacks).toHaveBeenCalledWith('logout.successful');
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeFalsy();
+            });
+        });
     });
 
     describe('tests with server info stored', function()
@@ -651,6 +714,76 @@ describe('angular-digest-auth', function()
             _authIdentity.isAuthorized().then(function(value)
             {
                 expect(value).toBeFalsy();
+            });
+        });
+
+        it('should sign out and then sign in again', function()
+        {
+            _stateMachine.send('signin');
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeTruthy();
+            });
+
+            expect(_authRequests.signin).toHaveBeenCalled();
+
+            _httpBackend.expectPOST('/signin');
+            _httpBackend.flush(1);
+
+            expect(_authIdentity.set).toHaveBeenCalled();
+            expect(_authService.getCallbacks).toHaveBeenCalledWith('login.successful');
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeTruthy();
+            });
+
+            _stateMachine.send('signout');
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeFalsy();
+            });
+
+            _httpBackend.expectPOST('/signout');
+            _httpBackend.flush(1);
+
+            expect(_authIdentity.clear).toHaveBeenCalled();
+            expect(_authService.getCallbacks).toHaveBeenCalledWith('logout.successful');
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeFalsy();
+            });
+
+            _stateMachine.send('submitted', {
+                credentials: {
+                    username: 'test',
+                    password: 'test'
+                }
+            });
+
+            expect(_authService.setCredentials).toHaveBeenCalledWith('test', 'test');
+
+            _stateMachine.send('signin');
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeTruthy();
+            });
+
+            expect(_authRequests.signin).toHaveBeenCalled();
+
+            _httpBackend.expectPOST('/signin');
+            _httpBackend.flush(1);
+
+            expect(_authIdentity.set).toHaveBeenCalled();
+            expect(_authService.getCallbacks).toHaveBeenCalledWith('login.successful');
+
+            _authIdentity.isAuthorized().then(function(value)
+            {
+                expect(value).toBeTruthy();
             });
         });
     });

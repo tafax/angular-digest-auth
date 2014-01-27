@@ -1,3 +1,5 @@
+'use strict';
+
 describe('Authentication Storage Specifications', function()
 {
     var _mockup = function()

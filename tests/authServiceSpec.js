@@ -1,3 +1,5 @@
+'use strict';
+
 describe('Authentication Service Specification', function()
 {
     var _authService;
@@ -9,9 +11,9 @@ describe('Authentication Service Specification', function()
     beforeEach(function()
     {
         var fake = angular.module('test.config', []);
-        fake.config(['authServiceProvider', function(authServiceProvider)
+        fake.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
         {
-            authServiceProvider.callbacks.login.push(['$log', function($log)
+            dgAuthServiceProvider.callbacks.login.push(['$log', function($log)
             {
                 return {
                     successful: function()
@@ -29,7 +31,7 @@ describe('Authentication Service Specification', function()
                 };
             }]);
 
-            authServiceProvider.callbacks.login.push(['$log', function($log)
+            dgAuthServiceProvider.callbacks.login.push(['$log', function($log)
             {
                 return {
                     successful: function()
@@ -47,7 +49,7 @@ describe('Authentication Service Specification', function()
                 };
             }]);
 
-            authServiceProvider.callbacks.logout.push(['$log', function($log)
+            dgAuthServiceProvider.callbacks.logout.push(['$log', function($log)
             {
                 return {
                     successful: function()
@@ -61,7 +63,7 @@ describe('Authentication Service Specification', function()
                 };
             }]);
 
-            authServiceProvider.callbacks.logout.push(['$log', function($log)
+            dgAuthServiceProvider.callbacks.logout.push(['$log', function($log)
             {
                 return {
                     successful: function()

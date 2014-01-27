@@ -1,7 +1,7 @@
 /**
  * Used to manage the authentication.
  */
-dgAuth.provider('authService', [function AuthServiceProvider()
+dgAuth.provider('authService', ['dgAuthServiceProvider', function AuthServiceProvider(dgAuthServiceProvider)
 {
     /**
      * Creates the authentication service to performs
@@ -147,16 +147,6 @@ dgAuth.provider('authService', [function AuthServiceProvider()
     }
 
     /**
-     * Callbacks configuration.
-     *
-     * @type {{login: Array, logout: Array}}
-     */
-    this.callbacks = {
-        login: [],
-        logout: []
-    };
-
-    /**
      * Gets a new instance of AuthService.
      *
      * @type {Array}
@@ -176,7 +166,7 @@ dgAuth.provider('authService', [function AuthServiceProvider()
      */
     function($injector)
     {
-        return new AuthService(this.callbacks, $injector);
+        return new AuthService(dgAuthServiceProvider.callbacks, $injector);
     }];
 
 }]);

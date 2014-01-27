@@ -1,3 +1,5 @@
+'use strict';
+
 describe('Authentication Server Specification', function()
 {
     var _authServer;
@@ -32,9 +34,9 @@ describe('Authentication Server Specification', function()
     beforeEach(function()
     {
         var fake = angular.module('test.config', []);
-        fake.config(['authServerProvider', function(authServerProvider)
+        fake.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
         {
-            authServerProvider.setHeader('My-Header');
+            dgAuthServiceProvider.setHeader('My-Header');
         }]);
 
         module('test.config', 'dgAuth');

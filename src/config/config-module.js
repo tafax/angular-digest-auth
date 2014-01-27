@@ -6,13 +6,12 @@
 dgAuth.config(['$httpProvider', function($httpProvider)
 {
     $httpProvider.interceptors.push([
-        '$rootScope',
         '$q',
         'authService',
         'authClient',
         'authServer',
         'stateMachine',
-        function($rootScope, $q, authService, authClient, authServer, stateMachine)
+        function($q, authService, authClient, authServer, stateMachine)
         {
             return {
                 'request': function(request)

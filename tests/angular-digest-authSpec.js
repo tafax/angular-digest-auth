@@ -2,6 +2,7 @@
 
 describe('angular-digest-auth', function()
 {
+    var _dgAuthService;
     var _stateMachine;
 
     var _authIdentity;
@@ -104,6 +105,7 @@ describe('angular-digest-auth', function()
 
         inject(function($injector)
         {
+            _dgAuthService = $injector.get('dgAuthService');
             _stateMachine = $injector.get('stateMachine');
 
             _authIdentity = $injector.get('authIdentity');
@@ -231,7 +233,7 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.set).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalled();
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -255,7 +257,7 @@ describe('angular-digest-auth', function()
         {
             _stateMachine.send('signin');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -280,7 +282,7 @@ describe('angular-digest-auth', function()
 
             _stateMachine.send('signin');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -317,7 +319,7 @@ describe('angular-digest-auth', function()
 
             _stateMachine.send('signin');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -401,7 +403,7 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.set).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalled();
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -448,14 +450,14 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.set).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalled();
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
 
             _stateMachine.send('signout');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeFalsy();
             });
@@ -466,7 +468,7 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.clear).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalledWith('logout.successful');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeFalsy();
             });
@@ -530,7 +532,7 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.set).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalled();
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -540,7 +542,7 @@ describe('angular-digest-auth', function()
         {
             _stateMachine.send('signin');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -598,7 +600,7 @@ describe('angular-digest-auth', function()
         {
             _stateMachine.send('signin');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -611,7 +613,7 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.set).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalledWith('login.successful');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -621,7 +623,7 @@ describe('angular-digest-auth', function()
         {
             _stateMachine.send('signin');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -634,7 +636,7 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.set).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalledWith('login.successful');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -644,7 +646,7 @@ describe('angular-digest-auth', function()
             _httpBackend.expectGET('/change');
             _httpBackend.flush(1);
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeFalsy();
             });
@@ -670,7 +672,7 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.set).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalled();
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -680,7 +682,7 @@ describe('angular-digest-auth', function()
         {
             _stateMachine.send('signin');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -693,14 +695,14 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.set).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalledWith('login.successful');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
 
             _stateMachine.send('signout');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeFalsy();
             });
@@ -711,7 +713,7 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.clear).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalledWith('logout.successful');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeFalsy();
             });
@@ -721,7 +723,7 @@ describe('angular-digest-auth', function()
         {
             _stateMachine.send('signin');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -734,14 +736,14 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.set).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalledWith('login.successful');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
 
             _stateMachine.send('signout');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeFalsy();
             });
@@ -752,7 +754,7 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.clear).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalledWith('logout.successful');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeFalsy();
             });
@@ -768,7 +770,7 @@ describe('angular-digest-auth', function()
 
             _stateMachine.send('signin');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });
@@ -781,7 +783,7 @@ describe('angular-digest-auth', function()
             expect(_authIdentity.set).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalledWith('login.successful');
 
-            _authIdentity.isAuthorized().then(function(value)
+            _dgAuthService.isAuthorized().then(function(value)
             {
                 expect(value).toBeTruthy();
             });

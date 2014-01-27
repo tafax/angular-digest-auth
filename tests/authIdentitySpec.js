@@ -95,31 +95,4 @@ describe('Authentication Identity Specification', function()
             expect(_authIdentity.get()).toBeNull();
         });
     });
-
-    describe('tests the method to check authentication', function()
-    {
-        it('should return false', function()
-        {
-            _authIdentity.isAuthorized().then(function(authenticated)
-            {
-                expect(authenticated).toBeFalsy();
-            });
-
-            _httpBackend.expectPOST('/fake');
-            _httpBackend.flush(1);
-        });
-
-        it('should return true', function()
-        {
-            _authIdentity.set(null, _identity);
-
-            _authIdentity.isAuthorized().then(function(authenticated)
-            {
-                expect(authenticated).toBeTruthy();
-            });
-
-            _httpBackend.expectPOST('/fake');
-            _httpBackend.flush(1);
-        });
-    });
 });

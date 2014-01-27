@@ -2,10 +2,9 @@
  * Manages authentication info in the client scope.
  */
 dgAuth.factory('authClient', [
-    '$rootScope',
     'authServer',
     'md5',
-function($rootScope, authServer, md5)
+function(authServer, md5)
 {
     /**
      * Creates the service to use information generating

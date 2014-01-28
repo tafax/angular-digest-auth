@@ -15,6 +15,10 @@ describe('Authentication Storage Specifications', function()
             {
                 _table[key] = value.toString();
             },
+            removeItem: function(key, value)
+            {
+                delete _table[key];
+            },
             clear: function()
             {
                 _table = {};
@@ -37,6 +41,7 @@ describe('Authentication Storage Specifications', function()
 
         spyOn(window.sessionStorage, 'setItem').andCallThrough();
         spyOn(window.sessionStorage, 'getItem').andCallThrough();
+        spyOn(window.sessionStorage, 'removeItem').andCallThrough();
 
         inject(function($injector)
         {
@@ -86,6 +91,24 @@ describe('Authentication Storage Specifications', function()
 
             expect(window.sessionStorage.getItem).toHaveBeenCalledWith('username');
             expect(window.sessionStorage.getItem).toHaveBeenCalledWith('password');
+        });
+
+        it('should clear the credentials', function()
+        {
+            _authStorage.setCredentials('test', 'test');
+
+            expect(_authStorage.hasServerAuth()).toBeTruthy();
+            expect(_authStorage.getUsername()).toEqual('test');
+            expect(_authStorage.getPassword()).toEqual('test');
+
+            _authStorage.clearCredentials();
+
+            expect(window.sessionStorage.removeItem).toHaveBeenCalledWith('username');
+            expect(window.sessionStorage.removeItem).toHaveBeenCalledWith('password');
+
+            expect(_authStorage.hasCredentials()).toBeFalsy();
+            expect(_authStorage.getUsername()).toBeUndefined();
+            expect(_authStorage.getPassword()).toBeUndefined();
         });
     });
 });

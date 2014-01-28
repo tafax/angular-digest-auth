@@ -97,14 +97,17 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
             action: [
                 'authService',
                 'authIdentity',
+                'authStorage',
                 'name',
                 'params',
-            function(authService, authIdentity, name, params)
+            function(authService, authIdentity, authStorage, name, params)
             {
                 if(name == 'logoutRequest')
                 {
                     authIdentity.clear();
                     authService.clearRequest();
+                    authService.clearCredentials();
+                    authStorage.clearCredentials();
 
                     var callbacksLogout = authService.getCallbacks('logout.successful');
                     for(var i in callbacksLogout)

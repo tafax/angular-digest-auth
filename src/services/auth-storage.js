@@ -58,6 +58,15 @@ dgAuth.provider('authStorage', ['dgAuthServiceProvider', function AuthStoragePro
         };
 
         /**
+         * Removes the credentials in the storage.
+         */
+        this.clearCredentials = function()
+        {
+            _storage.removeItem('username');
+            _storage.removeItem('password');
+        };
+
+        /**
          * Checks if storage contains the server information.
          *
          * @returns {boolean}

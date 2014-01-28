@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.4.0 - 2014-01-27
+ * @version v0.4.1 - 2014-01-28
  * @link https://github.com/tafax/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -166,14 +166,17 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
             action: [
                 'authService',
                 'authIdentity',
+                'authStorage',
                 'name',
                 'params',
-            function(authService, authIdentity, name, params)
+            function(authService, authIdentity, authStorage, name, params)
             {
                 if(name == 'logoutRequest')
                 {
                     authIdentity.clear();
                     authService.clearRequest();
+                    authService.clearCredentials();
+                    authStorage.clearCredentials();
 
                     var callbacksLogout = authService.getCallbacks('logout.successful');
                     for(var i in callbacksLogout)
@@ -1209,6 +1212,15 @@ dgAuth.provider('authStorage', ['dgAuthServiceProvider', function AuthStoragePro
         {
             _storage.setItem('username', username);
             _storage.setItem('password', password);
+        };
+
+        /**
+         * Removes the credentials in the storage.
+         */
+        this.clearCredentials = function()
+        {
+            _storage.removeItem('username');
+            _storage.removeItem('password');
         };
 
         /**

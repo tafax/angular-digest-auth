@@ -203,3 +203,6 @@ app.config(['$routeProvider', function($routeProvider)
 
 #License
 [MIT](https://github.com/tafax/angular-digest-auth/blob/master/LICENSE)
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/tafax/angular-digest-auth/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+

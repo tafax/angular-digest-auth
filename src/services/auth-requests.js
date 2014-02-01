@@ -50,11 +50,23 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
                     {
                         request.deferred.resolve(response);
 
+                        if(_times > 0)
+                            _times = 0;
+
+                        if(stateMachine.isAvailable('201'))
+                            stateMachine.send('201', {response: response});
+
                         return response;
                     },
                     function(response)
                     {
                         request.deferred.reject(response);
+
+                        if(_times > 0)
+                            _times = 0;
+
+                        if(stateMachine.isAvailable('failure'))
+                            stateMachine.send('failure', {response: response});
 
                         return response;
                     });

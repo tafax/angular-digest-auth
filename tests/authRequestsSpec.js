@@ -92,6 +92,8 @@ describe('Authentication Requests Specifications', function()
 
         it('should do the request previous saved', function()
         {
+            spyOn(_stateMachine, 'isAvailable').andReturn(true);
+
             spyOn(_authService, 'hasRequest').andReturn(true);
             spyOn(_authService, 'getRequest').andCallFake(function()
             {
@@ -124,6 +126,9 @@ describe('Authentication Requests Specifications', function()
 
             _httpBackend.expectGET('/request');
             _httpBackend.flush(1);
+
+            expect(_stateMachine.isAvailable).toHaveBeenCalled();
+            expect(_stateMachine.send).toHaveBeenCalled();
         });
     });
 
@@ -153,6 +158,8 @@ describe('Authentication Requests Specifications', function()
 
         it('should do the request previous saved', function()
         {
+            spyOn(_stateMachine, 'isAvailable').andReturn(false);
+
             spyOn(_authService, 'hasRequest').andReturn(true);
             spyOn(_authService, 'getRequest').andCallFake(function()
             {
@@ -185,6 +192,8 @@ describe('Authentication Requests Specifications', function()
 
             _httpBackend.expectGET('/request');
             _httpBackend.flush(1);
+
+            expect(_stateMachine.isAvailable).toHaveBeenCalled();
         });
     });
 

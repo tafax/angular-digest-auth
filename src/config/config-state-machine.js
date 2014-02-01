@@ -117,8 +117,9 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                     }
                 }
 
-                authIdentity.clear();
+                authIdentity.suspend();
                 authService.clearCredentials();
+                authStorage.clearCredentials();
                 var callbacksLogin = authService.getCallbacks('login.required');
                 for(var j in callbacksLogin)
                 {
@@ -153,7 +154,12 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
 
                 if(name == 'loginRequest')
                 {
-                    authIdentity.set(null, params.response.data);
+                    if(authIdentity.isSuspended())
+                        authIdentity.restore();
+
+                    if(!authIdentity.has())
+                        authIdentity.set(null, params.response.data);
+
                     authService.clearRequest();
 
                     var credentials = authService.getCredentials();

@@ -56,7 +56,16 @@ describe('angular-digest-auth', function()
                 return {
                     successful: function(response)
                     {
-                        expect(response.data).toEqual(_identity);
+                        if(response.url == '/signin')
+                        {
+                            expect(response.data).toEqual(_identity);
+                        }
+
+                        if(response.url == '/change')
+                        {
+                            expect(response.data).toEqual('OK');
+                        }
+
                         expect(authIdentity.has()).toEqual(true);
                         expect(authIdentity.get()).toEqual(_identity);
                     },
@@ -118,19 +127,28 @@ describe('angular-digest-auth', function()
             _http = $injector.get('$http');
             _httpBackend = $injector.get('$httpBackend');
 
+            var changeCount = 0;
+
             _httpBackend.whenGET('/change').respond(function(method, url, data, headers)
             {
-                var responseHeaders = {
-                    'X-Auth-Digest': 'Digest ' +
-                        'realm="Test AngularJS module", ' +
-                        'domain="/", ' +
-                        'nonce="32fffd4e446fc7735c4995154674e9d4", ' +
-                        'opaque="e66aa41ca5bf6992a5479102cc787bc9", ' +
-                        'algorithm="MD5", ' +
-                        'qop="auth"'
-                };
+                if(changeCount == 0)
+                {
+                    changeCount++;
 
-                return [401, angular.toJson(_loginError), responseHeaders];
+                    var responseHeaders = {
+                        'X-Auth-Digest': 'Digest ' +
+                            'realm="Test AngularJS module", ' +
+                            'domain="/", ' +
+                            'nonce="32fffd4e446fc7735c4995154674e9d4", ' +
+                            'opaque="e66aa41ca5bf6992a5479102cc787bc9", ' +
+                            'algorithm="MD5", ' +
+                            'qop="auth"'
+                    };
+
+                    return [401, angular.toJson(_loginError), responseHeaders];
+                }
+
+                return [200, 'OK', ''];
             });
 
             _httpBackend.whenPOST('/signin').respond(function(method, url, data, headers)
@@ -621,6 +639,8 @@ describe('angular-digest-auth', function()
 
         it('should resubmit the credentials', function()
         {
+            spyOn(_authStorage, 'clearCredentials');
+
             _stateMachine.send('signin');
 
             _dgAuthService.isAuthorized().then(function(value)
@@ -641,7 +661,10 @@ describe('angular-digest-auth', function()
                 expect(value).toBeTruthy();
             });
 
-            _http.get('/change');
+            _http.get('/change').then(function(response)
+            {
+                expect(response.data).toEqual('OK');
+            });
 
             _httpBackend.expectGET('/change');
             _httpBackend.flush(1);
@@ -651,7 +674,7 @@ describe('angular-digest-auth', function()
                 expect(value).toBeFalsy();
             });
 
-            expect(_authIdentity.clear).toHaveBeenCalled();
+            expect(_authStorage.clearCredentials).toHaveBeenCalled();
             expect(_authService.clearCredentials).toHaveBeenCalled();
             expect(_authService.getCallbacks).toHaveBeenCalledWith('login.required');
 
@@ -670,7 +693,7 @@ describe('angular-digest-auth', function()
             _httpBackend.flush(1);
 
             expect(_authIdentity.set).toHaveBeenCalled();
-            expect(_authService.getCallbacks).toHaveBeenCalled();
+            expect(_authService.getCallbacks).toHaveBeenCalledWith('login.successful');
 
             _dgAuthService.isAuthorized().then(function(value)
             {

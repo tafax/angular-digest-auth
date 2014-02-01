@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.4.1 - 2014-01-28
+ * @version v0.4.2 - 2014-02-01
  * @link https://github.com/tafax/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -186,8 +186,9 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                     }
                 }
 
-                authIdentity.clear();
+                authIdentity.suspend();
                 authService.clearCredentials();
+                authStorage.clearCredentials();
                 var callbacksLogin = authService.getCallbacks('login.required');
                 for(var j in callbacksLogin)
                 {
@@ -222,7 +223,12 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
 
                 if(name == 'loginRequest')
                 {
-                    authIdentity.set(null, params.response.data);
+                    if(authIdentity.isSuspended())
+                        authIdentity.restore();
+
+                    if(!authIdentity.has())
+                        authIdentity.set(null, params.response.data);
+
                     authService.clearRequest();
 
                     var credentials = authService.getCredentials();
@@ -675,6 +681,7 @@ dgAuth.factory('authIdentity', function()
     function AuthIdentity()
     {
         /**
+         * The current identity of user.
          *
          * @type {Object|null}
          * @private
@@ -682,12 +689,25 @@ dgAuth.factory('authIdentity', function()
         var _identity = null;
 
         /**
+         * Specifies if the identity is suspended.
+         *
+         * @type {boolean}
+         * @private
+         */
+        var _suspended = false;
+
+        /**
+         * Sets the entire identity fields or
+         * if key is specified, one of these.
          *
          * @param {string} [key]
          * @param {Object|string|Array} value
          */
         this.set = function(key, value)
         {
+            if(_suspended)
+                return;
+
             if(key)
             {
                 if(null == _identity)
@@ -705,13 +725,17 @@ dgAuth.factory('authIdentity', function()
         };
 
         /**
-         *
+         * Gets the entire identity of
+         * if key is specified, one single field.
          *
          * @param {string} [key]
          * @returns {Object|Array|string|null}
          */
         this.get = function(key)
         {
+            if(_suspended)
+                return null;
+
             if(!key)
                 return _identity;
 
@@ -722,20 +746,52 @@ dgAuth.factory('authIdentity', function()
         };
 
         /**
+         * Returns true if the identity
+         * is properly set.
          *
          * @returns {boolean}
          */
         this.has = function()
         {
+            if(_suspended)
+                return false;
+
             return (null !== _identity);
         };
 
         /**
-         *
+         * Clears the identity.
          */
         this.clear = function()
         {
             _identity = null;
+        };
+
+        /**
+         * Suspends the identity.
+         */
+        this.suspend = function()
+        {
+            _suspended = true;
+        };
+
+        /**
+         * Restores identity that is
+         * previously suspended.
+         */
+        this.restore = function()
+        {
+            _suspended = false;
+        };
+
+        /**
+         * Checks if the identity is suspended.
+         *
+         * @returns {boolean}
+         */
+        this.isSuspended = function()
+        {
+            return _suspended;
         };
     }
 
@@ -1080,11 +1136,23 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
                     {
                         request.deferred.resolve(response);
 
+                        if(_times > 0)
+                            _times = 0;
+
+                        if(stateMachine.isAvailable('201'))
+                            stateMachine.send('201', {response: response});
+
                         return response;
                     },
                     function(response)
                     {
                         request.deferred.reject(response);
+
+                        if(_times > 0)
+                            _times = 0;
+
+                        if(stateMachine.isAvailable('failure'))
+                            stateMachine.send('failure', {response: response});
 
                         return response;
                     });

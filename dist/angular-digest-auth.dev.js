@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.4.2 - 2014-02-01
+ * @version v0.4.3 - 2014-02-02
  * @link https://github.com/tafax/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT

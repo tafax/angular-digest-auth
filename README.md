@@ -1,7 +1,21 @@
-#AngularJS HTTP Digest Authentication [![Build Status](https://travis-ci.org/tafax/angular-digest-auth.png?branch=master)](https://travis-ci.org/tafax/angular-digest-auth)
-It is an AngularJS module to manage HTTP Digest Authentication. It provides basic functionality
-to sign in and sign out. It automatically manages the synchronization between the client and the
-server after the user did the login.
+#AngularJS HTTP Digest Authentication
+[![Build Status](https://travis-ci.org/tafax/angular-digest-auth.png?branch=master)](https://travis-ci.org/tafax/angular-digest-auth)
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/tafax/angular-digest-auth/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
+It is an AngularJS module to manage [HTTP Digest Authentication](http://en.wikipedia.org/wiki/Digest_access_authentication) in the REST API web apps.
+It provides functionality to avoid the default form of browsers and use your own. The login and logout are based on digest access authentication
+and the module helps to manage the user identity in the client side.
+You can use this module in order to protect your app and authorize the user to navigate inside it.
+
+#Features
+* Using your own login and logout
+* Interceptor to pass the authorization in all further requests after the login
+* Protection for login with a limitation for the number of requests
+* Storage for reusing credentials
+* Managing identity with `authIdentity` service
+* Authorization checking as promise with `dgAuthService`
+* Custom header to parse server information(realm, opaque, domain, etc...)
+* Custom callbacks to handle all authorization states(login successful, login error, login required, etc...)
 
 #Installation
 You can download this by:
@@ -9,20 +23,22 @@ You can download this by:
 * Downloading manually the [unminified version](https://raw.github.com/tafax/angular-digest-auth/master/dist/angular-digest-auth.js) or
 the [minified production version](https://raw.github.com/tafax/angular-digest-auth/master/dist/angular-digest-auth.min.js)
 
-Import the module in your app.
+After installation, import the module in your app.
 ````javascript
 var app = angular.module('myApp', ['dgAuth']);
 ````
 
 #Dependencies
-This module depends on [angular](https://github.com/angular/angular.js), [angular-state-machine](https://github.com/tafax/angular-state-machine)
+This module depends by [angular](https://github.com/angular/angular.js), [angular-state-machine](https://github.com/tafax/angular-state-machine)
 and [angular-md5](https://github.com/gdi2290/angular-md5).
 
 #Configuration
 You have to provide a few configurations in order to work.
 
 ###Login and logout
-How to configure the urls to sing in and sign out.
+Create the services to sign in and sign out in order to simulate the login and
+the logout in your app. `signin` service should return the JSON of the user identity.
+You can use the user identity with `authIdentity` service.
 ````javascript
 app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 {
@@ -44,10 +60,15 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 ````
 
 ###Header
-How to configure the header to search server information.
+How to configure the header to parse server information. You should define a custom header in the server side
+in order to avoid the browser form and use your custom login form.
 ````javascript
 app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 {
+    /**
+     * Specifies the header to look for server information.
+     * The header you have used in the server side.
+     */
     dgAuthServiceProvider.setHeader('Your-Header-For-Authentication');
 }]);
 ````
@@ -165,8 +186,11 @@ $scope.submit = function(user)
 };
 ````
 
+If the login is successful, all further requests, for the API in the domain specified by the server header,
+contains the authentication to authorize the user.
+
 #Authorization
-You can use a functionality of dgAuthService to authorize the user to navigate in your app.
+You can use a functionality of `dgAuthService` to authorize the user to navigate in your app.
 ````javascript
 app.config(['$routeProvider', function($routeProvider)
 {
@@ -203,6 +227,4 @@ app.config(['$routeProvider', function($routeProvider)
 
 #License
 [MIT](https://github.com/tafax/angular-digest-auth/blob/master/LICENSE)
-
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/tafax/angular-digest-auth/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 

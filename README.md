@@ -20,6 +20,7 @@ You can use this module in order to protect your app and authorize the user to n
 #Installation
 You can download this by:
 * Using bower and running `bower install angular-digest-auth --save` (recommended)
+* Using npm: `npm install tafax/angular-digest-auth`
 * Downloading manually the [unminified version](https://raw.github.com/tafax/angular-digest-auth/master/dist/angular-digest-auth.js) or
 the [minified production version](https://raw.github.com/tafax/angular-digest-auth/master/dist/angular-digest-auth.min.js)
 

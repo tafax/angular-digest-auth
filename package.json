@@ -9,6 +9,11 @@
     "type": "git",
     "url": "git://github.com/tafax/angular-digest-auth.git"
   },
+  "dependencies": {
+    "angular": "*",
+    "angular-md5": "*",
+    "angular-state-machine": "git://github.com/tafax/angular-state-machine"
+  },
   "devDependencies": {
     "grunt-cli": ">= 0.1.7",
     "grunt-contrib-uglify": "*",

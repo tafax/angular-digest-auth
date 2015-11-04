@@ -34,7 +34,7 @@ This module depends by [angular](https://github.com/angular/angular.js), [angula
 and [angular-md5](https://github.com/gdi2290/angular-md5).
 
 #Configuration
-You have to provide a few configurations in order to work.
+You need to configure the module as follows.
 
 ###Login and logout
 Create the services to sign in and sign out in order to simulate the login and
@@ -61,8 +61,20 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 ````
 
 ###Header
-How to configure the header to parse server information. You should define a custom header in the server side
-in order to avoid the browser form and use your custom login form.
+How to configure the header to parse server information. 
+
+There is no good non-intrusive method for disabling the custom browser
+pop-up at the time of writing.  See for example these Stack Overflow
+questions:
+
+* [How can I supress the browser's authentication dialog?](https://stackoverflow.com/questions/86105)
+* [How to prevent browser to invoke basic auth popup and handle 401 error using Jquery?](https://stackoverflow.com/questions/9859627)
+
+The solution assumed here is that web server sends a custom
+alternative to the WWW-Authenticate header in order to avoid the
+browser opening the default authentication dialog. For example,
+X-WWW-Authenticate. The value should be the same as it would be for
+WWW-Authenticate.
 ````javascript
 app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 {
@@ -73,6 +85,21 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
     dgAuthServiceProvider.setHeader('Your-Header-For-Authentication');
 }]);
 ````
+
+Note, for more general interoperation, the server could be configured
+to send this alternative header only if it sees the following header
+in the request, which is usally sent by default in AJAX calls.
+
+    X-Requested-With: XMLHttpRequest
+
+This way, HTTP-Digest works as normal on non-AJAX clients.
+
+AngularJS as of v1.3.0 [needs to be instructed to include this](http://www.nabito.net/angularjs-http-not-sending-x-requested-with-header/)
+as follows:
+
+    myAppModule.config(['$httpProvider', function($httpProvider) {
+        $httpProvider.defaults.headers.common["X-Requested-With"] = 'XMLHttpRequest';
+    }]);
 
 ###Limit
 How to configure the limit of number requests to sign in. When the limit is exceeded

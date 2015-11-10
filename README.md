@@ -129,8 +129,10 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
     /**
      * You can add the callbacks to manage what happens after
      * successful of the login.
+     *
+     * Note, replace this example's `someService` with whichever services you need.
      */
-    dgAuthServiceProvider.callbacks.login.push(['serviceInject', function(serviceInject)
+    dgAuthServiceProvider.callbacks.login.push(['someService', function(someService)
     {
         return {
             successful: function(response)
@@ -157,8 +159,10 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
     /**
      * You can add the callbacks to manage what happens after
      * successful of the logout.
+     *
+     * Note, replace this example's `someService` with whichever services you need.
      */
-    dgAuthServiceProvider.callbacks.logout.push(['serviceInject', function(serviceInject)
+    dgAuthServiceProvider.callbacks.logout.push(['someService', function(someService)
     {
         return {
             successful: function(response)

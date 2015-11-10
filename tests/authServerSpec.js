@@ -3,7 +3,6 @@
 describe('Authentication Server Specification', function()
 {
     var _authServer;
-
     var _authStorage;
     var _cases = [
         {
@@ -33,19 +32,35 @@ describe('Authentication Server Specification', function()
                 qop: 'auth'
             },
         },
+        {
+            /* Attributes which are not as well behaved: nonalphanumeric characters!
+             */
+            name: "Case 3",
+            info: {
+                realm: ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~',
+                domain: '/domain',
+                nonce: 'cb584e44c43ed6bd0bc2d9c7e242837d',
+                opaque: '94619f8a70068b2591c2eed622525b0e',
+                algorithm: 'MD5',
+                qop: 'auth'
+            },
+        },
     ];
-
 
     function Response(info)
     {
+        function quote(x) {
+            return '"'+x.replace(/"/g, '\\"')+'"';
+        }
+
         var _header = {
             "My-Header": "Digest " +
-                "realm=\"" + info.realm + "\", " +
-                "domain=\"" + info.domain + "\", " +
-                "nonce=\"" + info.nonce + "\", " +
-                "opaque=\"" + info.opaque + "\", " +
-                "algorithm=\"" + info.algorithm + "\", " +
-                "qop=\"" + info.qop + "\""
+                "realm=" + quote(info.realm) + ", " +
+                "domain=" + quote(info.domain) + ", " +
+                "nonce=" + quote(info.nonce) + ", " +
+                "opaque=" + quote(info.opaque) + ", " +
+                "algorithm=" + quote(info.algorithm) + ", " +
+                "qop=" + quote(info.qop) + ""
         };
 
         return {
@@ -75,14 +90,13 @@ describe('Authentication Server Specification', function()
             _authStorage = $injector.get('authStorage');
 
             spyOn(_authStorage, 'setServerAuth');
-
         });
     });
 
     describe('tests all methods', function()
     {
         _cases.forEach(function(_case) {
-            var info = _case.info
+            var info = _case.info;
 
             it('should set the information with manual configuration (case '+_case.name+')', function()
             {

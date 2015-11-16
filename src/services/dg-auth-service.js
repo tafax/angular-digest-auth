@@ -42,7 +42,7 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
         this.signin = function()
         {
             if(!_started)
-                throw 'You have to start te service first';
+                throw 'You have to start the service first';
 
             stateMachine.send('signin');
         };
@@ -53,7 +53,7 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
         this.signout = function()
         {
             if(!_started)
-                throw 'You have to start te service first';
+                throw 'You have to start the service first';
 
             stateMachine.send('signout');
         };
@@ -68,7 +68,7 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
         this.setCredentials = function(username, password)
         {
             if(!_started)
-                throw 'You have to start te service first';
+                throw 'You have to start the service first';
 
             stateMachine.send('submitted', {
                 credentials: {

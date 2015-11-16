@@ -20,6 +20,7 @@ You can use this module in order to protect your app and authorize the user to n
 #Installation
 You can download this by:
 * Using bower and running `bower install angular-digest-auth --save` (recommended)
+* Using npm: `npm install tafax/angular-digest-auth`
 * Downloading manually the [unminified version](https://raw.github.com/tafax/angular-digest-auth/master/dist/angular-digest-auth.js) or
 the [minified production version](https://raw.github.com/tafax/angular-digest-auth/master/dist/angular-digest-auth.min.js)
 
@@ -29,16 +30,16 @@ var app = angular.module('myApp', ['dgAuth']);
 ````
 
 #Dependencies
-This module depends by [angular](https://github.com/angular/angular.js), [angular-state-machine](https://github.com/tafax/angular-state-machine)
+This module depends on [angular](https://github.com/angular/angular.js), [angular-state-machine](https://github.com/tafax/angular-state-machine)
 and [angular-md5](https://github.com/gdi2290/angular-md5).
 
 #Configuration
-You have to provide a few configurations in order to work.
+You need to configure the module as follows.
 
 ###Login and logout
-Create the services to sign in and sign out in order to simulate the login and
-the logout in your app. `signin` service should return the JSON of the user identity.
-You can use the user identity with `authIdentity` service.
+You need to provide two URLs on your webserver to simulate the login and
+the logout in your app. The `signin` URL should return the user identity in a JSON response.
+You can access this information via the `authIdentity` service.
 ````javascript
 app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 {
@@ -60,8 +61,20 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 ````
 
 ###Header
-How to configure the header to parse server information. You should define a custom header in the server side
-in order to avoid the browser form and use your custom login form.
+How to configure the header to parse server information. 
+
+There is no good non-intrusive method for disabling the custom browser
+pop-up at the time of writing.  See for example these Stack Overflow
+questions:
+
+* [How can I supress the browser's authentication dialog?](https://stackoverflow.com/questions/86105)
+* [How to prevent browser to invoke basic auth popup and handle 401 error using Jquery?](https://stackoverflow.com/questions/9859627)
+
+The solution assumed here is that web server sends a custom
+alternative to the WWW-Authenticate header in order to avoid the
+browser opening the default authentication dialog. For example,
+X-WWW-Authenticate. The value should be the same as it would be for
+WWW-Authenticate.
 ````javascript
 app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 {
@@ -73,10 +86,25 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 }]);
 ````
 
+Note, for more general interoperation, the server could be configured
+to send this alternative header only if it sees the following header
+in the request, which is usally sent by default in AJAX calls.
+
+    X-Requested-With: XMLHttpRequest
+
+This way, HTTP-Digest works as normal on non-AJAX clients.
+
+AngularJS as of v1.3.0 [needs to be instructed to include this](http://www.nabito.net/angularjs-http-not-sending-x-requested-with-header/)
+as follows:
+
+    myAppModule.config(['$httpProvider', function($httpProvider) {
+        $httpProvider.defaults.headers.common["X-Requested-With"] = 'XMLHttpRequest';
+    }]);
+
 ###Limit
-How to configure the limit of number requests to sign in. When the limit is exceeded
-`limit` of login callbacks is invoked. The default limit is 4.
-N.B.: the limit includes the request to sign in place during the invocation of the `start` method.
+Configure the maximum number requests to sign in as in the example below. When the limit is exceeded,
+the `limit` method in the configured callbacks is invoked. The default limit is 4.
+N.B.: the limit includes the initial request to sign in following the invocation of the `start` method.
 ````javascript
 app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 {
@@ -93,7 +121,7 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 }]);
 ````
 
-###Calbacks
+###Callbacks
 How to configure what happens at the user login and/or logout.
 ````javascript
 app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
@@ -101,8 +129,10 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
     /**
      * You can add the callbacks to manage what happens after
      * successful of the login.
+     *
+     * Note, replace this example's `someService` with whichever services you need.
      */
-    dgAuthServiceProvider.callbacks.login.push(['serviceInject', function(serviceInject)
+    dgAuthServiceProvider.callbacks.login.push(['someService', function(someService)
     {
         return {
             successful: function(response)
@@ -129,8 +159,10 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
     /**
      * You can add the callbacks to manage what happens after
      * successful of the logout.
+     *
+     * Note, replace this example's `someService` with whichever services you need.
      */
-    dgAuthServiceProvider.callbacks.logout.push(['serviceInject', function(serviceInject)
+    dgAuthServiceProvider.callbacks.logout.push(['someService', function(someService)
     {
         return {
             successful: function(response)
@@ -147,9 +179,9 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 ````
 
 ###Storage
-By default, after the user has made the login, the credentials are stored in `sessionStorage` and the module
-processes all further requests with this credentials. If you want to restore the user credentials when
-he returns in your app, you can specify the `localStorage` as default storage.
+By default, after the user has logged in, the credentials are stored in `sessionStorage` and the module
+processes all further requests with these credentials. If you want these user credentials
+to persist for more than a single visit to your app, you can specify the `localStorage` as default storage.
 ````javascript
 app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 {
@@ -163,7 +195,7 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 Obviously, if you want to specify your own storage object, you can :).
 
 #Usage
-For basic usage, you can launch the `start()` when your app goes run.
+For basic usage, you can launch the `start()` when your app runs.
 ````javascript
 app.run(['dgAuthService', function(dgAuthService)
 {
@@ -176,8 +208,8 @@ app.run(['dgAuthService', function(dgAuthService)
 }]);
 ````
 
-In your login controller you should provide the credentials submitted by user.
-Then you have to sign in another time.
+You should provide the credentials to submit on behalf of the user in your login controller.
+Then you have to sign in again.
 ````javascript
 $scope.submit = function(user)
 {
@@ -186,11 +218,11 @@ $scope.submit = function(user)
 };
 ````
 
-If the login is successful, all further requests, for the API in the domain specified by the server header,
-contains the authentication to authorize the user.
+If the login is successful, all further requests for the API in the domain specified by the server header,
+will contain the credentials to authorize the user.
 
 #Authorization
-You can use a functionality of `dgAuthService` to authorize the user to navigate in your app.
+You can use this functionality of `dgAuthService` to authorize the user to navigate in your app.
 ````javascript
 app.config(['$routeProvider', function($routeProvider)
 {

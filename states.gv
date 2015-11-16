@@ -1,0 +1,33 @@
+/* This describes the state transition network implemented within angular-http-digest
+ */
+
+digraph angular_http_digest {
+    rankdir=LR;
+    
+    // This section here to influence dot's rank precedence
+    loginError; 
+    init [ peripheries=2 ];
+    subgraph s1 { rank=same; init, restoringCredentials, settingCredentials, loginRequest, loggedIn };
+    subgraph s2 { rank=same; loginError, failureLogin };
+    subgraph s3 { rank=max; logoutRequest }
+
+    
+    init -> restoringCredentials [ label="run",style=dashed ];
+    restoringCredentials -> settingCredentials [ label="restored" ];
+    settingCredentials -> loginRequest [ label="signin",style=dashed ];
+
+    loginRequest -> loggedIn [ label="201 (success)" ];
+    loginRequest -> waitingCredentials [ label="401 (unauthorised\n& no credentials)" ];
+    loginRequest -> failureLogin [ label="401 (unauthorised\n& limit reached)" ];
+    loginRequest -> loginError [ label="401 (unauthorised\n& credentials)" ];
+
+    logoutRequest -> loggedIn [ label="401 (unauthorised)"; ];
+    logoutRequest -> waitingCredentials [ label="201 (success)" ];
+
+    loggedIn -> logoutRequest [ label="signout",style=dashed ];
+    loggedIn -> waitingCredentials [ label="401 (unauthorised)" ];
+
+    loginError -> settingCredentials [ label="submitted",style=dashed ];
+
+    waitingCredentials -> settingCredentials [ label="submitted",style=dashed ];
+}

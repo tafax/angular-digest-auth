@@ -123,6 +123,8 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
                 },
                 function(response)
                 {
+                    stateMachine.send('401', {response: response});
+                    
                     return response;
                 });
             return _promise;

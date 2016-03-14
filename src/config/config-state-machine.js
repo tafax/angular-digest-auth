@@ -37,6 +37,7 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                 {
                     var credentials = params.credentials;
                     authService.setCredentials(credentials.username, credentials.password);
+                    delete params.credentials;
                 }
             }]
         },
@@ -108,6 +109,7 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                     authService.clearRequest();
                     authService.clearCredentials();
                     authStorage.clearCredentials();
+                    delete params.credentials;
 
                     var callbacksLogout = authService.getCallbacks('logout.successful');
                     for(var i in callbacksLogout)
@@ -144,6 +146,11 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
             {
                 if(name == 'logoutRequest')
                 {
+                    authIdentity.clear();
+                    authService.clearRequest();
+                    authService.clearCredentials();
+                    authStorage.clearCredentials();
+                    delete params.credentials;
                     var callbacksLogout = authService.getCallbacks('logout.error');
                     for(var i in callbacksLogout)
                     {

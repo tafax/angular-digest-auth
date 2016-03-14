@@ -66,7 +66,8 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                         return !authRequests.getValid();
                     }]
                 }],
-                201: 'loggedIn'
+                201: 'loggedIn',
+                failure: 'loginError'
             },
             //Does the request to the server and save the promise
             action: ['authRequests', function(authRequests)

@@ -1,13 +1,14 @@
-#AngularJS HTTP Digest Authentication
+# This library is deprecated. Sorry guys I have no time to maintain it. Check my new project [@layerr](https://github.com/tafax/layerr)
+
+# AngularJS HTTP Digest Authentication
 [![Build Status](https://travis-ci.org/tafax/angular-digest-auth.png?branch=master)](https://travis-ci.org/tafax/angular-digest-auth)
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/tafax/angular-digest-auth/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 
 It is an AngularJS module to manage [HTTP Digest Authentication](http://en.wikipedia.org/wiki/Digest_access_authentication) in the REST API web apps.
 It provides functionality to avoid the default form of browsers and use your own. The login and logout are based on digest access authentication
 and the module helps to manage the user identity in the client side.
 You can use this module in order to protect your app and authorize the user to navigate inside it.
 
-#Features
+## Features
 * Using your own login and logout
 * Interceptor to pass the authorization in all further requests after the login
 * Protection for login with a limitation for the number of requests
@@ -17,7 +18,7 @@ You can use this module in order to protect your app and authorize the user to n
 * Custom header to parse server information(realm, opaque, domain, etc...)
 * Custom callbacks to handle all authorization states(login successful, login error, login required, etc...)
 
-#Installation
+## Installation
 You can download this by:
 * Using bower and running `bower install angular-digest-auth --save` (recommended)
 * Downloading manually the [unminified version](https://raw.github.com/tafax/angular-digest-auth/master/dist/angular-digest-auth.js) or
@@ -28,14 +29,14 @@ After installation, import the module in your app.
 var app = angular.module('myApp', ['dgAuth']);
 ````
 
-#Dependencies
+## Dependencies
 This module depends by [angular](https://github.com/angular/angular.js), [angular-state-machine](https://github.com/tafax/angular-state-machine)
 and [angular-md5](https://github.com/gdi2290/angular-md5).
 
-#Configuration
+## Configuration
 You have to provide a few configurations in order to work.
 
-###Login and logout
+### Login and logout
 Create the services to sign in and sign out in order to simulate the login and
 the logout in your app. `signin` service should return the JSON of the user identity.
 You can use the user identity with `authIdentity` service.
@@ -59,7 +60,7 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 }]);
 ````
 
-###Header
+### Header
 How to configure the header to parse server information. You should define a custom header in the server side
 in order to avoid the browser form and use your custom login form.
 ````javascript
@@ -73,7 +74,7 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 }]);
 ````
 
-###Limit
+### Limit
 How to configure the limit of number requests to sign in. When the limit is exceeded
 `limit` of login callbacks is invoked. The default limit is 4.
 N.B.: the limit includes the request to sign in place during the invocation of the `start` method.
@@ -93,7 +94,7 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 }]);
 ````
 
-###Calbacks
+### Callbacks
 How to configure what happens at the user login and/or logout.
 ````javascript
 app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
@@ -146,7 +147,7 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 }]);
 ````
 
-###Storage
+### Storage
 By default, after the user has made the login, the credentials are stored in `sessionStorage` and the module
 processes all further requests with this credentials. If you want to restore the user credentials when
 he returns in your app, you can specify the `localStorage` as default storage.
@@ -162,7 +163,7 @@ app.config(['dgAuthServiceProvider', function(dgAuthServiceProvider)
 
 Obviously, if you want to specify your own storage object, you can :).
 
-#Usage
+## Usage
 For basic usage, you can launch the `start()` when your app goes run.
 ````javascript
 app.run(['dgAuthService', function(dgAuthService)
@@ -189,7 +190,7 @@ $scope.submit = function(user)
 If the login is successful, all further requests, for the API in the domain specified by the server header,
 contains the authentication to authorize the user.
 
-#Authorization
+## Authorization
 You can use a functionality of `dgAuthService` to authorize the user to navigate in your app.
 ````javascript
 app.config(['$routeProvider', function($routeProvider)
@@ -225,6 +226,6 @@ app.config(['$routeProvider', function($routeProvider)
 }]);
 ````
 
-#License
+## License
 [MIT](https://github.com/tafax/angular-digest-auth/blob/master/LICENSE)
 

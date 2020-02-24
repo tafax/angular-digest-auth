@@ -14,7 +14,7 @@ module.exports = function(config) {
 
     // list of files / patterns to load in the browser
     files: [
-      'lib/angular/angular.min.js',
+      'lib/angular/angular.js',
       'lib/angular-mocks/angular-mocks.js',
       'lib/angular-md5/angular-md5.js',
       'lib/angular-state-machine/src/angular-state-machine.js',
@@ -25,6 +25,7 @@ module.exports = function(config) {
       'src/services/dg-auth-service.js',
       'src/services/auth-client.js',
       'src/services/auth-identity.js',
+      'src/services/auth-parser.js',
       'src/services/auth-server.js',
       'src/services/auth-service.js',
       'src/services/auth-requests.js',

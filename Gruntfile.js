@@ -61,6 +61,7 @@ module.exports = function(grunt)
                     'src/services/auth-client.js',
                     'src/services/auth-events.js',
                     'src/services/auth-identity.js',
+                    'src/services/auth-parser.js',
                     'src/services/auth-server.js',
                     'src/services/auth-service.js',
                     'src/services/auth-requests.js',

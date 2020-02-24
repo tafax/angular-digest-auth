@@ -3,22 +3,64 @@
 describe('Authentication Server Specification', function()
 {
     var _authServer;
-
-    var _md5;
     var _authStorage;
-
-    var _info;
+    var _cases = [
+        {
+            name: "Case 1",
+            info: {
+                realm: 'Test Authentication Realm',
+                domain: '/domain',
+                nonce: 'cb584e44c43ed6bd0bc2d9c7e242837d',
+                opaque: '94619f8a70068b2591c2eed622525b0e',
+                algorithm: 'MD5',
+                qop: 'auth'
+            },
+        },
+        {
+            /* Adapted from real example using Restlet 2.3 server.
+             * The important diffences are a base64 nonce with padding ('==').
+             * If the padding is stripped, the authentication attempt is rejected.
+             * Also that the opaque attribute is an empty string.
+             */
+            name: "Case 2",
+            info: {
+                realm: 'Test Authentication Realm',
+                domain: '/domain',
+                nonce: 'MTQ0NzA2MDcwOTc1OTphYTEzYWY4ZDczOTc0YTk5NjQ1Nzg0ZjU2NzgwNjIwNw==',
+                opaque: '',
+                algorithm: 'MD5',
+                qop: 'auth'
+            },
+        },
+        {
+            /* Attributes which are not as well behaved: nonalphanumeric characters!
+             */
+            name: "Case 3",
+            info: {
+                realm: ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~',
+                domain: '/domain',
+                nonce: 'cb584e44c43ed6bd0bc2d9c7e242837d',
+                opaque: '94619f8a70068b2591c2eed622525b0e',
+                algorithm: 'MD5',
+                qop: 'auth'
+            },
+        },
+    ];
 
     function Response(info)
     {
+        function quote(x) {
+            return '"'+x.replace(/"/g, '\\"')+'"';
+        }
+
         var _header = {
             "My-Header": "Digest " +
-                "realm=\"" + info.realm + "\", " +
-                "domain=\"" + info.domain + "\", " +
-                "nonce=\"" + info.nonce + "\", " +
-                "opaque=\"" + info.opaque + "\", " +
-                "algorithm=\"" + info.algorithm + "\", " +
-                "qop=\"" + info.qop + "\""
+                "realm=" + quote(info.realm) + ", " +
+                "domain=" + quote(info.domain) + ", " +
+                "nonce=" + quote(info.nonce) + ", " +
+                "opaque=" + quote(info.opaque) + ", " +
+                "algorithm=" + quote(info.algorithm) + ", " +
+                "qop=" + quote(info.qop) + ""
         };
 
         return {
@@ -45,40 +87,35 @@ describe('Authentication Server Specification', function()
         {
             _authServer = $injector.get('authServer');
 
-            _md5 = $injector.get('md5');
             _authStorage = $injector.get('authStorage');
 
             spyOn(_authStorage, 'setServerAuth');
-
-            _info = {
-                realm: 'Test Authentication Realm',
-                domain: '/domain',
-                nonce: _md5.createHash('nonce'),
-                opaque: _md5.createHash('opaque'),
-                algorithm: 'MD5',
-                qop: 'auth'
-            };
         });
     });
 
     describe('tests all methods', function()
     {
-        it('should set the information with manual configuration', function()
-        {
-            _authServer.setConfig(_info);
+        _cases.forEach(function(_case) {
+            var info = _case.info;
 
-            expect(_authServer.isConfigured()).toBeTruthy();
-            expect(_authServer.info).toEqual(_info);
-        });
-
-        it('should set the information with response', function()
-        {
-            _authServer.parseHeader(new Response(_info));
-
-            expect(_authStorage.setServerAuth).toHaveBeenCalled();
-
-            expect(_authServer.isConfigured()).toBeTruthy();
-            expect(_authServer.info).toEqual(_info);
+            it('should set the information with manual configuration (case '+_case.name+')', function()
+            {
+                _authServer.setConfig(info);
+                
+                expect(_authServer.isConfigured()).toBeTruthy();
+                expect(_authServer.info).toEqual(info);
+            });
+            
+            it('should set the information with response (case '+_case.name+')', function()
+            {
+                _authServer.parseHeader(new Response(info));
+                
+                expect(_authStorage.setServerAuth).toHaveBeenCalled();
+                
+                expect(_authServer.isConfigured()).toBeTruthy();
+                expect(_authServer.info).toEqual(info);
+            });
+            
         });
     });
 });

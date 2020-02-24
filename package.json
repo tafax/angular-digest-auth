@@ -10,6 +10,7 @@
     "url": "git://github.com/tafax/angular-digest-auth.git"
   },
   "devDependencies": {
+    "angular-mocks": "*",
     "grunt-cli": ">= 0.1.7",
     "grunt-contrib-uglify": "*",
     "grunt-conventional-changelog": "*",

@@ -23,7 +23,7 @@ dgAuth.provider('authServer', ['dgAuthServiceProvider', function AuthServerProvi
          * @type {RegExp}
          * @private
          */
-        var _valuePattern = /([a-zA-Z]+)=\"?([a-zA-Z0-9\/\s]+)\"?/;
+        var _valuePattern = /([a-zA-Z]+)=\"?([a-zA-Z0-9-.:\/\s]+)\"?/;
 
         /**
          * True if the header was correctly parsed.

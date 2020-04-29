@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.4.3 - 2014-02-02
+ * @version v0.4.3 - 2014-10-22
  * @link https://github.com/tafax/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -825,7 +825,7 @@ dgAuth.provider('authServer', ['dgAuthServiceProvider', function AuthServerProvi
          * @type {RegExp}
          * @private
          */
-        var _valuePattern = /([a-zA-Z]+)=\"?([a-zA-Z0-9\/\s]+)\"?/;
+        var _valuePattern = /([a-zA-Z]+)=\"?([a-zA-Z0-9-.:\/\s]+)\"?/;
 
         /**
          * True if the header was correctly parsed.

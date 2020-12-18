@@ -8,7 +8,6 @@
     "url": "git://github.com/tafax/angular-digest-auth.git"
   },
   "dependencies": {
-    "angular-cookies": "*",
     "angular-md5": "*",
     "angular-state-machine": "*",
     "angular": "*"
